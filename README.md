@@ -178,6 +178,7 @@ The suite includes an independent, pure-Python and `gmpy2`-accelerated mathemati
 The application features a modern Cyber/Glassmorphism web dashboard on `http://localhost:5000` with real-time SSE streaming logs:
 
 - **12 Guided Category Selectors**: `Auto`, `RSA`, `Classical`, `XOR`, `AES`, `ECC`, `Lattice`, `PRNG`, `Hash`, `Encoding`, `Binary`, `Custom`
+- **Multi-File & Multi-Format Upload Section**: Drag-and-drop or select multiple files simultaneously across diverse formats (Python/Sage scripts, PEM/DER keys, encrypted binaries, images/stego, packet captures, structured data) with format badges and individual file removal
 - **30+ Interactive Attack Strategy Chips**: Guide the agent or test specific vulnerabilities directly
 - **Decoded Output Viewer**: Clean output panel with copy functionality for any plaintext, key, or flag format
 - **Candidate Permutations Panel**: Visualizes all classical cipher decryptions ranked by English quadgram scoring
@@ -189,7 +190,7 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 |---|---|---|---|
 | `/api/classical` | `POST` | `{"text": "..."}` | Direct instant analysis & decryption of classical ciphers (18 methods) |
 | `/api/rsa` | `POST` | `{"text": "N=... e=... c=..."}` | Direct instant parameter parsing & RSA attack execution |
-| `/solve` | `POST` | `FormData(challenge, category, attack, file)` | Dispatches challenge to autonomous LangGraph agent |
+| `/solve` | `POST` | `FormData(challenge, category, attack, challenge_files)` | Dispatches challenge & uploaded files to autonomous LangGraph agent |
 | `/stream/<job_id>` | `GET` | — | Server-Sent Events (SSE) live stream of logs and execution results |
 
 ---

@@ -9,24 +9,23 @@ from agent import crypto_solver_agent
 INPUTS_DIR = Path(__file__).parent / "inputs"
 OUTPUTS_DIR = Path(__file__).parent / "outputs"
 
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp"}
-TEXT_EXTENSIONS = {".txt", ".py", ".sage", ".c", ".cpp", ".json", ".enc", ".pem", ".log"}
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".gif", ".webp", ".tiff", ".tif", ".svg", ".ico"}
 
 def inspect_image(filepath: Path) -> str:
     """Extracts metadata from image files for cryptanalysis/stego."""
     try:
         with Image.open(filepath) as img:
-            info = f"File: {filepath.name} | Format: {img.format} | Size: {img.size} | Mode: {img.mode}\n"
+            info = f"File: {filepath.name} | Format: {img.format} | Dimensions: {img.size} | Mode: {img.mode}\n"
             exif = img.getexif()
             if exif:
                 info += f"EXIF Tags: {dict(exif)}\n"
-            info += f"Note: This image is saved in the working directory as '{filepath.name}'. Your solver script can open it using `PIL.Image.open('{filepath.name}')`."
+            info += f"Note: This image is accessible in the working directory as '{filepath.name}'. Open with `PIL.Image.open('{filepath.name}')`."
             return info
     except Exception as e:
         return f"File: {filepath.name} (Error reading image: {e})"
 
 def gather_challenge_context() -> str:
-    """Scans the inputs/ folder for prompt, code files, and images."""
+    """Scans the inputs/ folder for prompt, code files, keys, and images."""
     context_parts = []
     
     # 1. Check for command-line text argument
@@ -43,21 +42,39 @@ def gather_challenge_context() -> str:
                 if content:
                     context_parts.append(f"Challenge Prompt ({main_file}):\n{content}\n")
 
-    # 3. Check for accompanying files in inputs/
+    # 3. Check for accompanying files in inputs/ (multi-format support)
     other_files = [f for f in INPUTS_DIR.iterdir() if f.is_file() and f.name not in ["prompt.txt", "challenge.txt", "problem.txt", ".gitkeep"]]
     
     for f in other_files:
         ext = f.suffix.lower()
-        if ext in TEXT_EXTENSIONS:
-            with open(f, "r", encoding="utf-8", errors="ignore") as tf:
-                context_parts.append(f"--- Attached File: {f.name} ---\n{tf.read().strip()}\n")
-        elif ext in IMAGE_EXTENSIONS:
+        if ext in IMAGE_EXTENSIONS:
             # Copy image to current working directory so solver script can access it
             shutil.copy(f, Path(__file__).parent / f.name)
             img_info = inspect_image(f)
             context_parts.append(f"--- Attached Image ---\n{img_info}\n")
         else:
-            context_parts.append(f"--- Attached Binary File: {f.name} ({f.stat().st_size} bytes) available in working directory ---")
+            try:
+                raw_bytes = f.read_bytes()
+                printable = sum(32 <= b <= 126 or b in (9, 10, 13) for b in raw_bytes[:4000])
+                total = min(len(raw_bytes), 4000)
+                is_text = (printable / max(total, 1)) > 0.80
+
+                if is_text:
+                    text_content = raw_bytes.decode("utf-8", errors="replace").strip()
+                    if len(text_content) > 100000:
+                        preview = text_content[:100000] + f"\n... [Truncated: showing 100KB of {len(raw_bytes)} bytes]"
+                    else:
+                        preview = text_content
+                    context_parts.append(f"--- Attached File: {f.name} ({len(raw_bytes)} bytes) ---\n{preview}\n")
+                else:
+                    hex_sample = raw_bytes[:128].hex()
+                    context_parts.append(
+                        f"--- Attached Binary/Encrypted File: {f.name} ({len(raw_bytes)} bytes) ---\n"
+                        f"First {min(len(raw_bytes), 128)} bytes (hex): {hex_sample}\n"
+                        f"Available in working directory as '{f.name}'. Open with `open('{f.name}', 'rb')`.\n"
+                    )
+            except Exception as e:
+                context_parts.append(f"--- Attached File: {f.name} (size: {f.stat().st_size} bytes, error reading: {e}) ---\n")
 
     # 4. If nothing was found, ask interactively
     if not context_parts:

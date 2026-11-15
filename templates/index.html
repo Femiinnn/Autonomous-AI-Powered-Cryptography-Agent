@@ -278,18 +278,77 @@ textarea:focus{
 .upload-label b{color:var(--cyan-l);}
 .upload-hint{font-size:11px;color:var(--text-3);font-family:'JetBrains Mono',monospace;}
 
-.file-pill{
-  display:none;align-items:center;gap:10px;
-  margin-top:12px;padding:10px 14px;
-  background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);
-  border-radius:var(--radius-sm);
+/* Multi-file format tags */
+.format-tags-row{
+  display:flex;flex-wrap:wrap;gap:5px;margin-top:10px;
 }
-.file-pill.show{display:flex;}
-.file-pill-icon{font-size:18px;}
-.file-pill-name{font-size:13px;font-family:'JetBrains Mono',monospace;color:var(--emerald-l);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.file-pill-size{font-size:11px;color:var(--text-3);flex-shrink:0;}
-.file-clear{background:none;border:none;color:var(--rose);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px;transition:opacity var(--transition);}
-.file-clear:hover{opacity:.7;}
+.format-tag{
+  font-size:10px;font-family:'JetBrains Mono',monospace;
+  padding:3px 8px;border-radius:4px;
+  background:rgba(255,255,255,.025);border:1px solid rgba(148,163,184,.08);
+  color:var(--text-3);transition:all var(--transition);
+}
+.format-tag:hover{border-color:rgba(148,163,184,.2);color:var(--text-2);}
+
+/* Multi-file list container */
+.file-list-wrap{
+  margin-top:14px;
+  display:flex;flex-direction:column;gap:8px;
+}
+.file-list-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 2px;
+}
+.file-list-count{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+  color:var(--emerald-l);display:flex;align-items:center;gap:6px;
+  font-family:'JetBrains Mono',monospace;
+}
+.file-clear-all{
+  background:none;border:none;color:var(--rose);
+  font-size:11px;font-weight:600;cursor:pointer;
+  padding:2px 8px;border-radius:4px;
+  transition:all var(--transition);font-family:'Inter',sans-serif;
+}
+.file-clear-all:hover{background:rgba(244,63,94,.12);}
+
+.file-items-container{
+  display:flex;flex-direction:column;gap:6px;
+  max-height:220px;overflow-y:auto;padding-right:2px;
+}
+.file-items-container::-webkit-scrollbar{width:3px;}
+.file-items-container::-webkit-scrollbar-thumb{background:rgba(148,163,184,.15);border-radius:2px;}
+
+.file-pill-item{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:8px 12px;border-radius:var(--radius-sm);
+  background:rgba(16,185,129,.06);border:1px solid rgba(16,185,129,.18);
+  transition:all var(--transition);
+}
+.file-pill-item:hover{
+  background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.3);
+}
+.file-pill-left{
+  display:flex;align-items:center;gap:10px;overflow:hidden;flex:1;
+}
+.file-pill-icon{font-size:17px;flex-shrink:0;}
+.file-pill-details{
+  display:flex;flex-direction:column;gap:2px;overflow:hidden;flex:1;
+}
+.file-pill-name{
+  font-size:12px;font-family:'JetBrains Mono',monospace;
+  color:var(--text-1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-weight:500;
+}
+.file-pill-meta{
+  font-size:10.5px;color:var(--text-3);font-family:'JetBrains Mono',monospace;
+}
+.file-remove-btn{
+  background:none;border:none;color:var(--text-3);cursor:pointer;
+  font-size:14px;padding:3px 6px;border-radius:4px;
+  transition:all var(--transition);margin-left:8px;
+}
+.file-remove-btn:hover{color:var(--rose);background:rgba(244,63,94,.15);}
 
 /* ══════════════════════════════════════════════════════════════════════════
    CATEGORY GRID
@@ -867,18 +926,29 @@ textarea:focus{
           <span class="char-count" id="char-count">0 chars</span>
         </div>
 
-        <label class="field-label" style="margin-top:18px;">Attach File <span style="color:var(--text-3);font-weight:400;text-transform:none;font-size:11px;">(image, .txt, .pem, .enc, .py …)</span></label>
+        <label class="field-label" style="margin-top:18px;">Attach Files <span style="color:var(--text-3);font-weight:400;text-transform:none;font-size:11px;">(Supports multiple files &amp; multi-format: code, keys, ciphertexts, images)</span></label>
         <div class="upload-zone" id="upload-zone">
-          <input type="file" id="file-input" accept=".txt,.py,.sage,.json,.pem,.enc,.log,.png,.jpg,.jpeg,.bmp,.gif,.webp" />
-          <div class="upload-icon">📎</div>
-          <div class="upload-label">Drop file here or <b>browse</b></div>
-          <div class="upload-hint">.txt · .py · .pem · .enc · .png · .jpg and more</div>
+          <input type="file" id="file-input" multiple />
+          <div class="upload-icon">📂</div>
+          <div class="upload-label">Drop files here or <b>browse</b></div>
+          <div class="upload-hint">Upload multiple files · Code (.py/.sage), Keys (.pem), Encrypted (.enc/.bin), Data, Images</div>
         </div>
-        <div class="file-pill" id="file-pill">
-          <span class="file-pill-icon" id="file-icon">📄</span>
-          <span class="file-pill-name" id="file-name"></span>
-          <span class="file-pill-size" id="file-size"></span>
-          <button class="file-clear" id="file-clear">✕</button>
+
+        <div class="format-tags-row">
+          <span class="format-tag">🐍 .py / .sage</span>
+          <span class="format-tag">🔑 .pem / .key / .pub</span>
+          <span class="format-tag">🔒 .enc / .bin / .hex</span>
+          <span class="format-tag">📄 .txt / .out / .json</span>
+          <span class="format-tag">🖼️ .png / .jpg / .bmp</span>
+          <span class="format-tag">📦 .zip / .pcap</span>
+        </div>
+
+        <div class="file-list-wrap" id="file-list-wrap" style="display:none;">
+          <div class="file-list-header">
+            <span class="file-list-count" id="file-count-label">📁 0 files selected</span>
+            <button type="button" class="file-clear-all" id="file-clear-all">Clear All</button>
+          </div>
+          <div class="file-items-container" id="file-items-container"></div>
         </div>
       </div>
     </div>
@@ -1244,32 +1314,133 @@ function selectedCategory() {
   return document.querySelector('.cat-card.active')?.dataset.val || 'auto';
 }
 
-/* ── File upload ──────────────────────────────────────────────────────────── */
-const uploadZone = document.getElementById('upload-zone');
-const fileInput  = document.getElementById('file-input');
-const filePill   = document.getElementById('file-pill');
-const fileName   = document.getElementById('file-name');
-const fileSize   = document.getElementById('file-size');
-const fileIcon   = document.getElementById('file-icon');
-const fileClear  = document.getElementById('file-clear');
+/* ── Multi-File Upload & Multi-Format Handling ────────────────────────────── */
+const uploadZone     = document.getElementById('upload-zone');
+const fileInput      = document.getElementById('file-input');
+const fileListWrap   = document.getElementById('file-list-wrap');
+const fileCountLabel = document.getElementById('file-count-label');
+const fileClearAll   = document.getElementById('file-clear-all');
+const fileItemsBox   = document.getElementById('file-items-container');
 
-const IMG_EXTS = ['png','jpg','jpeg','bmp','gif','webp'];
+let uploadedFiles = []; // Array of File objects
+
 function fmt(b){return b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':(b/1048576).toFixed(1)+' MB';}
-function showFile(f){
-  const ext = f.name.split('.').pop().toLowerCase();
-  fileIcon.textContent = IMG_EXTS.includes(ext) ? '🖼️' : '📄';
-  fileName.textContent = f.name;
-  fileSize.textContent = fmt(f.size);
-  filePill.classList.add('show');
+
+function getFileIconAndType(filename) {
+  const ext = (filename.includes('.') ? filename.split('.').pop() : '').toLowerCase();
+  if (['png','jpg','jpeg','bmp','gif','webp','tiff','tif','svg','ico'].includes(ext)) {
+    return { icon: '🖼️', type: 'Image / Stego' };
+  }
+  if (ext === 'py') {
+    return { icon: '🐍', type: 'Python Script' };
+  }
+  if (ext === 'sage') {
+    return { icon: '🌿', type: 'SageMath Script' };
+  }
+  if (['c','cpp','h','hpp','rs','go','java','js','ts','sh','bash'].includes(ext)) {
+    return { icon: '⚙️', type: 'Source Code' };
+  }
+  if (['pem','pub','key','crt','cer','der','asc','pgp','gpg','pfx'].includes(ext)) {
+    return { icon: '🔑', type: 'Cryptographic Key' };
+  }
+  if (['enc','bin','raw','hex','b64','bytes','dat','dump'].includes(ext)) {
+    return { icon: '🔒', type: 'Encrypted / Binary' };
+  }
+  if (['json','yaml','yml','xml','toml'].includes(ext)) {
+    return { icon: '📋', type: 'Structured Data' };
+  }
+  if (['txt','log','out','ans','in','md','rst'].includes(ext)) {
+    return { icon: '📄', type: 'Text / Output' };
+  }
+  if (['zip','tar','gz','bz2','xz','7z'].includes(ext)) {
+    return { icon: '📦', type: 'Archive' };
+  }
+  if (['pcap','pcapng'].includes(ext)) {
+    return { icon: '📡', type: 'Packet Capture' };
+  }
+  if (['wav','mp3','ogg','flac'].includes(ext)) {
+    return { icon: '🎵', type: 'Audio / Stego' };
+  }
+  return { icon: '📎', type: 'File (' + (ext.toUpperCase() || 'DATA') + ')' };
 }
-fileInput.addEventListener('change', () => { if (fileInput.files[0]) showFile(fileInput.files[0]); });
-fileClear.addEventListener('click', e => { e.stopPropagation(); fileInput.value=''; filePill.classList.remove('show'); });
-['dragenter','dragover'].forEach(ev => uploadZone.addEventListener(ev, e => { e.preventDefault(); uploadZone.classList.add('drag'); }));
-['dragleave','drop'].forEach(ev => uploadZone.addEventListener(ev, () => uploadZone.classList.remove('drag')));
+
+function renderFileList() {
+  if (uploadedFiles.length === 0) {
+    fileListWrap.style.display = 'none';
+    fileItemsBox.innerHTML = '';
+    return;
+  }
+  fileListWrap.style.display = 'flex';
+  fileCountLabel.textContent = `📁 Attached Files (${uploadedFiles.length})`;
+  fileItemsBox.innerHTML = '';
+
+  uploadedFiles.forEach((file, index) => {
+    const meta = getFileIconAndType(file.name);
+    const item = document.createElement('div');
+    item.className = 'file-pill-item';
+    item.innerHTML = `
+      <div class="file-pill-left">
+        <span class="file-pill-icon">${meta.icon}</span>
+        <div class="file-pill-details">
+          <span class="file-pill-name" title="${esc(file.name)}">${esc(file.name)}</span>
+          <span class="file-pill-meta">${fmt(file.size)} · ${meta.type}</span>
+        </div>
+      </div>
+      <button type="button" class="file-remove-btn" data-index="${index}" title="Remove file">✕</button>
+    `;
+    fileItemsBox.appendChild(item);
+  });
+
+  // Attach individual remove handlers
+  fileItemsBox.querySelectorAll('.file-remove-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.index, 10);
+      uploadedFiles.splice(idx, 1);
+      renderFileList();
+    });
+  });
+}
+
+function addFiles(newFiles) {
+  if (!newFiles || newFiles.length === 0) return;
+  for (let i = 0; i < newFiles.length; i++) {
+    const f = newFiles[i];
+    const exists = uploadedFiles.some(existing => existing.name === f.name && existing.size === f.size);
+    if (!exists) {
+      uploadedFiles.push(f);
+    }
+  }
+  renderFileList();
+}
+
+fileInput.addEventListener('change', () => {
+  if (fileInput.files) {
+    addFiles(fileInput.files);
+    fileInput.value = '';
+  }
+});
+
+fileClearAll.addEventListener('click', (e) => {
+  e.stopPropagation();
+  uploadedFiles = [];
+  fileInput.value = '';
+  renderFileList();
+});
+
+['dragenter','dragover'].forEach(ev => uploadZone.addEventListener(ev, e => {
+  e.preventDefault();
+  uploadZone.classList.add('drag');
+}));
+['dragleave','drop'].forEach(ev => uploadZone.addEventListener(ev, () => {
+  uploadZone.classList.remove('drag');
+}));
 uploadZone.addEventListener('drop', e => {
   e.preventDefault();
-  const f = e.dataTransfer.files[0];
-  if (f) { try { fileInput.files = e.dataTransfer.files; } catch(_){} showFile(f); }
+  uploadZone.classList.remove('drag');
+  if (e.dataTransfer && e.dataTransfer.files) {
+    addFiles(e.dataTransfer.files);
+  }
 });
 
 /* ── Terminal ─────────────────────────────────────────────────────────────── */
@@ -1344,8 +1515,7 @@ function setBusy(v){
 
 btnSubmit.addEventListener('click', async () => {
   const text = ta.value.trim();
-  const file = fileInput.files[0];
-  if (!text && !file) {
+  if (!text && uploadedFiles.length === 0) {
     ta.focus();
     ta.style.borderColor='rgba(244,63,94,.5)';
     setTimeout(()=>ta.style.borderColor='',2000);
@@ -1378,7 +1548,12 @@ btnSubmit.addEventListener('click', async () => {
   fd.append('challenge', text);
   fd.append('category', selectedCategory());
   fd.append('attack', selectedAttack());
-  if (file) fd.append('challenge_file', file);
+  uploadedFiles.forEach(f => {
+    fd.append('challenge_files', f);
+  });
+  if (uploadedFiles.length > 0) {
+    fd.append('challenge_file', uploadedFiles[0]);
+  }
 
   let jobId;
   try {

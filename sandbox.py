@@ -24,6 +24,19 @@ class DockerCryptoSandbox:
         with tempfile.NamedTemporaryFile(suffix=ext, mode="w", delete=False, encoding="utf-8") as f:
             f.write(code)
             temp_path = f.name
+        workdir = os.path.dirname(temp_path)
+
+        # Copy challenge files from inputs/ into workdir so exploit can access them by relative filename
+        inputs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inputs")
+        if os.path.exists(inputs_dir) and os.path.isdir(inputs_dir):
+            for item in os.listdir(inputs_dir):
+                s = os.path.join(inputs_dir, item)
+                d = os.path.join(workdir, item)
+                if os.path.isfile(s) and not os.path.exists(d):
+                    try:
+                        shutil.copy2(s, d)
+                    except Exception:
+                        pass
 
         try:
             if not self.has_docker:
@@ -46,7 +59,8 @@ class DockerCryptoSandbox:
                     timeout=self.timeout,
                     env=env,
                     encoding="utf-8",
-                    errors="replace"
+                    errors="replace",
+                    cwd=workdir
                 )
                 return {
                     "stdout": res.stdout,
@@ -56,7 +70,6 @@ class DockerCryptoSandbox:
                 }
 
             filename = os.path.basename(temp_path)
-            workdir = os.path.dirname(temp_path)
 
             net_flag = "--network=host" if allow_network else "--network=none"
             runner_cmd = "sage" if is_sage else "python3"

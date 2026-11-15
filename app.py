@@ -10,20 +10,20 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'inputs'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
+app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32 MB
 
-ALLOWED_EXTENSIONS = {
-    'txt', 'py', 'sage', 'json', 'pem', 'enc', 'log', 'c', 'cpp',
-    'png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'
-}
-IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp'}
+DISALLOWED_EXTENSIONS = {'exe', 'bat', 'cmd', 'vbs', 'msi', 'scr', 'com', 'ps1'}
+IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'bmp', 'gif', 'webp', 'tiff', 'tif', 'svg', 'ico'}
 
 # In-memory job store: job_id -> Queue
 _job_queues: dict[str, queue.Queue] = {}
 
 
 def allowed_file(filename: str) -> bool:
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+    if not filename or '.' not in filename:
+        return True  # Files without extension are common in CTF (e.g. 'chall', 'output', 'secret')
+    ext = filename.rsplit('.', 1)[1].lower()
+    return ext not in DISALLOWED_EXTENSIONS
 
 
 def is_image(filename: str) -> bool:
@@ -43,39 +43,72 @@ def solve():
     category       = request.form.get('category', 'auto').strip()
     attack         = request.form.get('attack', 'auto').strip()
 
-    # ── Handle uploaded file ──────────────────────────────────────────────────
-    uploaded = request.files.get('challenge_file')
-    file_info = ''
-    if uploaded and uploaded.filename and allowed_file(uploaded.filename):
+    # ── Handle uploaded files (multi-file & multi-format support) ────────────
+    files_list = request.files.getlist('challenge_files')
+    if not files_list:
+        files_list = request.files.getlist('challenge_file')
+
+    file_info_blocks = []
+    app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
+
+    for uploaded in files_list:
+        if not uploaded or not uploaded.filename:
+            continue
         fname = secure_filename(uploaded.filename)
+        if not fname:
+            fname = f"upload_{int(time.time() * 1000)}"
+        if not allowed_file(fname):
+            continue
+
         save_path = app.config['UPLOAD_FOLDER'] / fname
-        app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
         uploaded.save(save_path)
 
         if is_image(fname):
-            # Provide image metadata as context
             try:
                 from PIL import Image
                 with Image.open(save_path) as img:
-                    file_info = (
+                    file_info_blocks.append(
                         f"\n--- Attached Image: {fname} ---\n"
-                        f"Format: {img.format} | Size: {img.size} | Mode: {img.mode}\n"
-                        f"Your solver can open it with PIL.Image.open('{fname}')\n"
+                        f"Format: {img.format} | Dimensions: {img.size} | Mode: {img.mode}\n"
+                        f"Your solver can open it directly in the working directory using:\n"
+                        f"    from PIL import Image\n"
+                        f"    img = Image.open('{fname}')\n"
                     )
             except Exception as e:
-                file_info = f"\n--- Attached Image: {fname} (could not read metadata: {e}) ---\n"
+                file_info_blocks.append(f"\n--- Attached Image: {fname} (size: {save_path.stat().st_size} bytes) ---\n")
         else:
-            # Read text-based file content
             try:
-                with open(save_path, 'r', encoding='utf-8', errors='ignore') as fh:
-                    file_info = f"\n--- Attached File: {fname} ---\n{fh.read().strip()}\n"
-            except Exception:
-                file_info = f"\n--- Attached File: {fname} ({save_path.stat().st_size} bytes) ---\n"
+                raw_bytes = save_path.read_bytes()
+                printable = sum(32 <= b <= 126 or b in (9, 10, 13) for b in raw_bytes[:4000])
+                total = min(len(raw_bytes), 4000)
+                is_text = (printable / max(total, 1)) > 0.80
+
+                if is_text:
+                    text_content = raw_bytes.decode('utf-8', errors='replace').strip()
+                    if len(text_content) > 100000:
+                        preview = text_content[:100000] + f"\n... [Truncated: showing 100KB of {len(raw_bytes)} bytes]"
+                    else:
+                        preview = text_content
+                    file_info_blocks.append(
+                        f"\n--- Attached File: {fname} ({len(raw_bytes)} bytes) ---\n"
+                        f"{preview}\n"
+                    )
+                else:
+                    hex_sample = raw_bytes[:128].hex()
+                    file_info_blocks.append(
+                        f"\n--- Attached Binary/Encrypted File: {fname} ({len(raw_bytes)} bytes) ---\n"
+                        f"First {min(len(raw_bytes), 128)} bytes (hex): {hex_sample}\n"
+                        f"The file is accessible in your solver working directory as '{fname}'. Read with:\n"
+                        f"    with open('{fname}', 'rb') as f:\n"
+                        f"        data = f.read()\n"
+                    )
+            except Exception as e:
+                file_info_blocks.append(f"\n--- Attached File: {fname} ({save_path.stat().st_size} bytes) ---\n")
 
     # Merge text + file content
     full_challenge = challenge_text
-    if file_info:
-        full_challenge = (full_challenge + '\n' + file_info).strip()
+    if file_info_blocks:
+        full_challenge = (full_challenge + '\n' + '\n'.join(file_info_blocks)).strip()
 
     if not full_challenge:
         return jsonify({'error': 'Please provide a challenge description or upload a file.'}), 400
