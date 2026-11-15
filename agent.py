@@ -14,20 +14,11 @@ except ImportError:
     pass
 
 # --- Configuration ---
-# Point to your local or cloud Llama-3 instance (Ollama, vLLM, LM Studio, or Groq)
-LLAMA3_API_BASE = os.getenv("LLAMA3_API_BASE", "http://localhost:8000/v1")
-LLAMA3_API_KEY = os.getenv("LLAMA3_API_KEY", "EMPTY")
-LLAMA3_MODEL_NAME = os.getenv("LLAMA3_MODEL_NAME", "meta-llama/Meta-Llama-3.1-8B-Instruct")
+# Point to your local or cloud LLM instance with automated model & key fallback
+from llm_manager import fallback_llm
 
 sandbox = DockerCryptoSandbox(image="crypto-sandbox:latest", timeout=30)
-
-llm = ChatOpenAI(
-    model=LLAMA3_MODEL_NAME,
-    openai_api_base=LLAMA3_API_BASE,
-    openai_api_key=LLAMA3_API_KEY,
-    temperature=0.1,
-    max_tokens=2048
-)
+llm = fallback_llm
 
 # --- State Definition ---
 class CryptoAgentState(TypedDict):

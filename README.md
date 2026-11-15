@@ -240,6 +240,7 @@ The model is trained using **Group Relative Policy Optimization (GRPO)** — a r
 ```
 crypto-ctf-agent/
 ├── agent.py              # LangGraph state machine — core reasoning loop
+├── llm_manager.py        # Automated Model & API Key Fallback Engine
 ├── solve.py              # CLI entry point: reads inputs/, launches agent
 ├── classical_crypto.py   # Classical cryptanalysis suite (18 methods & solvers)
 ├── rsa_cryptanalysis.py  # RSA cryptanalysis suite (15 attacks & LLL lattice)
@@ -268,7 +269,7 @@ crypto-ctf-agent/
 ### Prerequisites
 - Python 3.10+
 - Docker (recommended) or a local Python environment with gmpy2 + pycryptodome
-- A running Llama-3 endpoint: **Ollama**, **vLLM**, **LM Studio**, or **Groq Cloud**
+- A running LLM endpoint: **Groq Cloud**, **Ollama**, **vLLM**, or **LM Studio**
 
 ---
 
@@ -282,29 +283,25 @@ pip install -r requirements.txt
 
 ---
 
-### 2. Configure the LLM Backend
+### 2. Configure the LLM Backend & Automated Fallbacks
 
-Copy `.env.example` to `.env` and fill in your backend:
+Copy `.env.example` to `.env` and fill in your primary and fallback models:
 
 ```bash
 cp .env.example .env
 ```
 
 ```env
-# Option A: Local Ollama
-LLAMA3_API_BASE=http://localhost:11434/v1
-LLAMA3_API_KEY=ollama
-LLAMA3_MODEL_NAME=llama3.1:8b
-
-# Option B: Local vLLM
-LLAMA3_API_BASE=http://localhost:8000/v1
-LLAMA3_API_KEY=EMPTY
-LLAMA3_MODEL_NAME=meta-llama/Meta-Llama-3.1-8B-Instruct
-
-# Option C: Groq Cloud (free tier available)
+# Groq Cloud Configuration
 LLAMA3_API_BASE=https://api.groq.com/openai/v1
-LLAMA3_API_KEY=gsk_your_groq_key_here
-LLAMA3_MODEL_NAME=llama-3.1-8b-instant
+LLAMA3_API_KEY=gsk_your_primary_key_here
+LLAMA3_MODEL_NAME=openai/gpt-oss-120b
+
+# Automated Model Fallbacks (rotates when quota/rate-limits hit)
+FALLBACK_MODELS=qwen/qwen3.8-27b,openai/gpt-oss-20b,allam-2-7b
+
+# Automated API Key Rotation (rotates when an API key is exhausted)
+FALLBACK_API_KEYS=gsk_second_key_here,gsk_third_key_here
 ```
 
 ---

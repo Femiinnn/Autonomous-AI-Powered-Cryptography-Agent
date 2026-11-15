@@ -289,5 +289,15 @@ def api_rsa():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/models', methods=['GET'])
+def api_models():
+    """Returns the currently active model and configured fallback chain."""
+    try:
+        from llm_manager import fallback_llm
+        return jsonify(fallback_llm.get_status())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     app.run(debug=True, port=5000, threaded=True)
