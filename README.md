@@ -18,101 +18,179 @@
 
 **Crypto CTF Agent** is a fully autonomous AI system designed to **identify and exploit cryptographic vulnerabilities** in Capture The Flag (CTF) competition challenges — without human intervention.
 
-Given a raw challenge description (problem statement, ciphertext, public parameters), the agent will:
+Given a raw challenge description (problem statement, ciphertext, public parameters, or attached files), the agent will:
 
 1. **Classify** the cryptographic category and pinpoint the underlying mathematical flaw
 2. **Generate** a targeted exploit script in Python or SageMath
 3. **Execute** the script inside an isolated Docker sandbox
-4. **Recover and return** the hidden flag (`flag{...}`)
+4. **Recover and return** the decoded output (plaintext, decrypted secret, or `flag{...}` format)
 
 The agent is built on a **reinforcement learning foundation**: a GRPO (Group Relative Policy Optimization) fine-tuning pipeline trains Llama-3 to solve challenges with verifiable Docker execution rewards — no human-annotated preference data needed.
 
-> The core insight is treating **code execution correctness as a reward signal** — if the Docker sandbox extracts the flag, the model's reasoning is rewarded; if it crashes, the error is fed back for self-correction.
+> The core insight is treating **code execution correctness as a reward signal** — if the Docker sandbox extracts the valid plaintext or flag, the model's reasoning is rewarded; if it crashes, the error is fed back for self-correction.
 
 ---
 
 ## 🏗️ Architecture
 
-The agent is a **LangGraph state machine** with three nodes arranged in a self-correcting retry loop:
+The agent is a **LangGraph state machine** combining deterministic mathematical engines with reinforcement-learned LLM reasoning in a self-correcting loop:
 
 ```
  ┌─────────────────────────────────────────────────────────┐
  │                   CryptoAgentState                      │
- │   challenge · category · attack · is_sage               │
- │   generated_code · stdout · stderr · flag · iteration   │
+ │   challenge · category · attack · is_sage · iteration   │
+ │   generated_code · stdout · stderr · decoded_result     │
+ │   hash_analysis · classical_analysis · rsa_analysis     │
  └─────────────────────────────────────────────────────────┘
-            │
-            ▼
-  ┌──────────────────┐
-  │  1. classify     │  ◄──────────────────────────┐
-  │  Llama-3 reads   │                             │ re-classify
-  │  challenge,      │                             │ (iteration==2)
-  │  picks attack    │                             │
-  └────────┬─────────┘                             │
-           │                                       │
-           ▼                                       │
-  ┌──────────────────┐       error/retry           │
-  │  2. generate     │ ◄───────────────────────────┤
-  │  Llama-3 writes  │                             │
-  │  exploit code    │                             │
-  └────────┬─────────┘                             │
-           │                                       │
-           ▼                                       │
-  ┌──────────────────┐                             │
-  │  3. execute      │                             │
-  │  DockerSandbox   │                             │
-  │  runs the script │                             │
-  └────────┬─────────┘                             │
-           │                                       │
-           ▼                                       │
-    ┌─────────────┐    flag found      ┌──────┐    │
-    │  evaluation │ ─────────────────► │  END │    │
-    │  router     │    max retries     └──────┘    │
-    └─────────────┘ ─────────────────► END         │
-           │                                       │
-           └───────────────────────────────────────┘
+                            │
+                            ▼
+ ┌─────────────────────────────────────────────────────────┐
+ │                [Pre-Step] hash_detect                   │
+ │  Multi-Layer Hash/Encoding Decoder (hash_decoder.py)   │
+ │  Classical Cryptanalysis Engine    (classical_crypto.py)│
+ │  RSA Mathematical Pre-Analysis    (rsa_cryptanalysis.py)│
+ └──────────────────────────┬──────────────────────────────┘
+                            │ (verified flag found? -> END)
+                            ▼
+                  ┌──────────────────┐
+                  │  1. classify     │  ◄──────────────────────────┐
+                  │  Llama-3 reads   │                             │ re-classify
+                  │  challenge &     │                             │ (iteration==2)
+                  │  math parameters │                             │
+                  └────────┬─────────┘                             │
+                           │                                       │
+                           ▼                                       │
+                  ┌──────────────────┐       error/retry           │
+                  │  2. generate     │ ◄───────────────────────────┤
+                  │  Llama-3 writes  │                             │
+                  │  exploit code    │                             │
+                  └────────┬─────────┘                             │
+                           │                                       │
+                           ▼                                       │
+                  ┌──────────────────┐                             │
+                  │  3. execute      │                             │
+                  │  DockerSandbox   │                             │
+                  │  runs the script │                             │
+                  └────────┬─────────┘                             │
+                           │                                       │
+                           ▼                                       │
+                    ┌─────────────┐    flag found      ┌──────┐    │
+                    │  evaluation │ ─────────────────► │  END │    │
+                    │  router     │    max retries     └──────┘    │
+                    └─────────────┘ ─────────────────► END         │
+                           │                                       │
+                           └───────────────────────────────────────┘
 ```
 
 ### Node Details
 
+#### `detect_hash_or_encoding` (Pre-Step)
+- Scans challenge text for 12+ encoding layers (Base64/32/58/62/85, Hex, Binary, Octal, Morse, URL, HTML, ROT13/47)
+- Identifies cryptographic hash fingerprints (MD5, SHA-1/256/512, NTLM, CRC32, bcrypt, Argon2)
+- Performs statistical profiling: **Index of Coincidence (IoC)**, **$\chi^2$ frequency analysis**, and **Kasiski examination**
+- Automatically executes RSA parameter pre-testing (**Wiener**, **Fermat**, **Small $e$ root**, **Common Modulus**, **ROCA**) on mathematical challenges
+
 #### `classify_and_plan`
-- Sends the challenge text to **Llama-3** (Llama-3.1-8B-Instruct) using an expert cryptanalysis system prompt
-- Extracts: `CATEGORY`, `ATTACK`, `ENGINE` (python or sage)
-- On retry: injects the previous error and failed hypothesis as negative context so the model picks an alternative strategy
+- Sends challenge parameters + pre-analysis report to **Llama-3** (Llama-3.1-8B-Instruct) using specialized CTF cryptanalysis prompts
+- Determines: `CATEGORY` (RSA, Classical, AES, ECC, PRNG, Hash, XOR, Binary), `ATTACK`, and `ENGINE` (Python or SageMath)
+- On retry: injects previous traceback and failed hypotheses as negative feedback
 
 #### `generate_solver`
-- Sends the challenge + attack strategy to Llama-3 and requests a **standalone executable exploit script**
-- Cleans and extracts code from the markdown code block response
-- On retry: attaches `[STDERR]` and `[STDOUT]` from the failed run as feedback
+- Prompts Llama-3 to write a **standalone, self-contained exploit script**
+- Imports pre-built cryptanalysis helpers from `rsa_cryptanalysis.py` and `classical_crypto.py`
+- On retry: attaches `[STDERR]` and `[STDOUT]` from the failed container execution for self-correction
 
 #### `execute_in_docker`
-- Calls `DockerCryptoSandbox.execute()` which runs the script in an **ephemeral Docker container** with:
-  - `--network=none` (no internet access)
-  - `--memory=1g` and `--cpus=1.5` limits
-  - 30-second timeout
-  - Native Python fallback if Docker is unavailable
-- Scans stdout for `flag{...}` or `CTF{...}` patterns
+- Runs the generated exploit inside an **ephemeral Docker container** (SageMath + Python 3 + gmpy2 + pycryptodome + pwntools + z3)
+- Sandboxed with `--network=none`, `--memory=1g`, and strict 30-second timeout
+- Recovers flag or decoded plaintext output, returning error tracebacks if execution fails
 
 #### Evaluation Router
 | Condition | Action |
 |---|---|
-| `flag` found | → `END` ✅ |
-| `iteration == 2` (stuck) | → `classify` (rethink attack) |
-| `iteration < max_retries` | → `generate_solver` (fix code) |
+| Decoded result or `flag{...}` found | → `END` ✅ |
+| `iteration == 2` (stuck) | → `classify` (re-hypothesize attack) |
+| `iteration < max_retries` | → `generate_solver` (fix script) |
 | `iteration >= 4` | → `END` ❌ |
 
 ---
 
 ## 🔓 Supported Cryptographic Attacks
 
-| Attack | Trigger Condition | Engine |
+### 🛡️ RSA Cryptanalysis Suite (`rsa_cryptanalysis.py`)
+
+#### Essential RSA Mathematics
+The suite includes an independent, pure-Python and `gmpy2`-accelerated mathematical foundation:
+- **Euler's Totient Function**: $\phi(N) = (p-1)(q-1)$
+- **Carmichael Function**: $\lambda(N) = \text{lcm}(p-1, q-1)$
+- **Modular Exponentiation & Inverse**: Fast `pow(base, exp, mod)` and Extended Euclidean inverse
+- **Extended Euclidean Algorithm (xgcd)**: Computes Bézout coefficients satisfying $a \cdot x + b \cdot y = \gcd(a, b)$
+- **Chinese Remainder Theorem (CRT)**: Reconstructs integers from system of modular congruences
+- **Integer Roots & Prime Factorization**: Exact $e$-th roots over integers and Pollard / Fermat factoring
+- **Continued Fractions**: Continued fraction expansions and convergent generators for rational approximations
+- **Lattice Reduction (LLL)**: Pure-Python and `gmpy2` implementation of the Lenstra–Lenstra–Lovász basis reduction algorithm
+
+#### Attack Matrix (15 Algorithms)
+| Attack / Algorithm | Trigger Condition / Vulnerability | Method & Complexity |
 |---|---|---|
-| **Wiener Continued Fractions** | `e` is very large (small private `d`) | Python + gmpy2 |
-| **Fermat Factorization** | `p ≈ q` (primes are close together) | Python + gmpy2 |
-| **Common Modulus (Extended GCD)** | Same `N`, two `(e₁,c₁)` and `(e₂,c₂)` pairs | Python + gmpy2 |
-| **Small Public Exponent (e=3)** | Small `m`, no padding — integer cube root | Python |
-| **Boneh-Durfee / Lattice** | Large `e` beyond Wiener bound | SageMath |
-| **ECC / PRNG / Hash** | General category classification | Python / SageMath |
+| **Integer Factorization Recovery** | Given prime factors $p, q$ | Computes $\phi(N) = (p-1)(q-1)$, $d = e^{-1} \pmod{\phi(N)}$, decrypts $m = c^d \pmod N$ |
+| **Trial Division** | Modulus $N$ contains small prime factors | Checks factors up to $2 \times 10^6$ |
+| **Fermat Factorization** | Close primes: $|p - q| < N^{1/4}$ | Expresses $N = a^2 - b^2 = (a-b)(a+b)$ |
+| **Pollard's Rho** | Composite integer factorization | Cycle detection using $f(x) = (x^2 + c) \pmod N$ |
+| **Pollard's $p-1$** | Smooth prime factors | Succeeds when $p-1$ has small prime factors |
+| **Wiener Attack** | Small private exponent: $d < \frac{1}{3} N^{1/4}$ | Continued fraction convergents of $e/N$ |
+| **Håstad's Broadcast Attack** | Same $m$ sent to $e$ recipients with exponent $e$ | Solves $C = m^e \pmod{\prod N_i}$ via CRT, then extracts exact $e$-th root |
+| **Common Modulus Attack** | Same $N$, two coprime exponents $e_1, e_2$ | Extended Euclidean: $s_1 e_1 + s_2 e_2 = 1 \implies c_1^{s_1} c_2^{s_2} \equiv m \pmod N$ |
+| **Franklin-Reiter Attack** | Related messages: $m_2 = a \cdot m_1 + b \pmod N$ | Polynomial resultant / GCD root recovery |
+| **Coppersmith Small-Root Attack** | Stereotyped messages ($m = \text{prefix} \parallel x$, $|x| < N^{1/e}$) | Bivariate polynomial small root finding via LLL lattice reduction |
+| **Partial Key Exposure** | Lower bits of $d$ or $p$ leaked | Recovers full private key using Hensel lifting / lattice |
+| **Bellcore CRT Fault Attack** | Fault injected during RSA-CRT computation | Recovers prime factor $p = \gcd(S - S', N)$ from valid & faulty signatures |
+| **Low Public Exponent (Cube Root)** | Small $e$ ($e=3, 5$) and $m^e < N$ | Direct exact integer $e$-th root without modular wrap |
+| **Boneh-Durfee Attack** | Small private exponent beyond Wiener bound ($d < N^{0.292}$) | Sub-lattice basis reduction using LLL |
+| **ROCA Detection & Factorization** | Vulnerable Infineon RSA firmware (CVE-2017-15361) | Fast residue subgroup fingerprinting & discrete log factorization |
+
+### 🏛️ Classical Cryptanalysis Suite (`classical_crypto.py`)
+| Cipher / Method | Description | Algorithm & Technique |
+|---|---|---|
+| **Caesar Cipher** | Brute force all 25 shifts | Ranked by quadgram & Chi-squared English scoring |
+| **Affine Cipher** | $C = (a \cdot P + b) \pmod{26}$ | 312 key brute-force & known-plaintext modular inverse solver |
+| **Vigenère Cipher** | Polyalphabetic substitution | Automated Kasiski factor analysis, IoC, & per-column frequency solver |
+| **Atbash Cipher** | Reciprocal alphabet inversion ($A \leftrightarrow Z$) | Instant symmetric decode |
+| **ROT13 & ROT47** | Rotation substitution | ROT13 (letters) & ROT47 (printable ASCII 33–126) |
+| **Monoalphabetic Substitution** | Arbitrary 26-letter substitution | Hill climbing / simulated annealing with quadgram language model |
+| **Playfair Cipher** | $5 \times 5$ digraph matrix cipher | Matrix generator, digraph decryption, and shape analyzer |
+| **Hill Cipher** | Modular linear algebra over $\mathbb{Z}_{26}$ | $2 \times 2$ & $3 \times 3$ matrix inverse, known-plaintext, & brute-force |
+| **Rail Fence Cipher** | Zig-zag transposition cipher | Variable rail fence solver ($2 \le k \le 30$) with n-gram scoring |
+| **Columnar Transposition** | Row-write, column-read transposition | Permutation brute-force for key sizes $2 \le k \le 8$ |
+| **Single-Byte XOR** | 256-key XOR brute force | Byte frequency scoring & automatic `flag{...}` regex matching |
+| **Repeating-Key XOR** | Multi-byte keystream XOR | Normalized Hamming distance keysize detection & transposed block solver |
+| **Known-Plaintext XOR** | Key recovery from known prefix | Recovers key slice from known plaintexts (`flag{`, headers) & repeats |
+| **Frequency Analysis** | Monogram counts & percentages | Chi-squared ($\chi^2$) distance metric against standard English corpus |
+| **Kasiski Examination** | Polyalphabetic key length deduction | Repeated n-gram distance analysis & factor frequency ranking |
+| **Index of Coincidence (IoC)** | Text statistical randomness test | Calculates $\text{IC} = \frac{\sum f_i(f_i-1)}{N(N-1)}$ (English $\approx 0.067$) |
+| **N-gram Scoring** | Fluent language evaluation | Quadgram, trigram, and bigram log-probability language models |
+| **Crib Dragging** | Two-time pad / key reuse attack | Slides known crib across $C_1 \oplus C_2 = P_1 \oplus P_2$ to reveal plaintext |
+
+---
+
+### 🌐 Web Dashboard & REST APIs (`app.py`)
+
+The application features a modern Cyber/Glassmorphism web dashboard on `http://localhost:5000` with real-time SSE streaming logs:
+
+- **12 Guided Category Selectors**: `Auto`, `RSA`, `Classical`, `XOR`, `AES`, `ECC`, `Lattice`, `PRNG`, `Hash`, `Encoding`, `Binary`, `Custom`
+- **30+ Interactive Attack Strategy Chips**: Guide the agent or test specific vulnerabilities directly
+- **Decoded Output Viewer**: Clean output panel with copy functionality for any plaintext, key, or flag format
+- **Candidate Permutations Panel**: Visualizes all classical cipher decryptions ranked by English quadgram scoring
+- **Multi-Layer Encoding & Hash Inspection Card**: Displays recursive peeling layers and hash identification candidates
+
+#### Direct REST Endpoints
+
+| Endpoint | Method | Payload / Parameters | Description |
+|---|---|---|---|
+| `/api/classical` | `POST` | `{"text": "..."}` | Direct instant analysis & decryption of classical ciphers (18 methods) |
+| `/api/rsa` | `POST` | `{"text": "N=... e=... c=..."}` | Direct instant parameter parsing & RSA attack execution |
+| `/solve` | `POST` | `FormData(challenge, category, attack, file)` | Dispatches challenge to autonomous LangGraph agent |
+| `/stream/<job_id>` | `GET` | — | Server-Sent Events (SSE) live stream of logs and execution results |
 
 ---
 
@@ -162,8 +240,12 @@ The model is trained using **Group Relative Policy Optimization (GRPO)** — a r
 crypto-ctf-agent/
 ├── agent.py              # LangGraph state machine — core reasoning loop
 ├── solve.py              # CLI entry point: reads inputs/, launches agent
+├── classical_crypto.py   # Classical cryptanalysis suite (18 methods & solvers)
+├── rsa_cryptanalysis.py  # RSA cryptanalysis suite (15 attacks & LLL lattice)
+├── hash_decoder.py       # Multi-layer hash & encoding auto-detector
+├── app.py                # Web dashboard & real-time SSE streaming solver
 ├── sandbox.py            # Docker execution engine with native fallback
-├── data_generator.py     # Synthetic RSA challenge factory (Wiener/Fermat/Common Modulus)
+├── data_generator.py     # Synthetic challenge factory (RSA, XOR, Classical, Binary)
 ├── train_llama3_grpo.py  # GRPO RL fine-tuning pipeline with Docker rewards
 ├── scratch_solve.py      # Quick one-off LLM query script (Groq/OpenAI compatible)
 ├── search_ctf.py         # (Utility) CTF challenge search helper
@@ -174,7 +256,8 @@ crypto-ctf-agent/
 │   └── prompt.txt        # Drop your challenge here
 └── outputs/
     ├── exploit.py        # Last generated exploit script
-    └── flag.txt          # Recovered flag
+    ├── result.txt        # Recovered plaintext / decoded result
+    └── flag.txt          # Extracted flag format (if present)
 ```
 
 ---
@@ -237,24 +320,42 @@ docker build -t crypto-sandbox:latest .
 
 ### 4. Solve a Challenge
 
-**Option A — Drop it in a file:**
+**Option A — Launch the Web Dashboard (Recommended):**
+```bash
+python app.py
+# Open http://localhost:5000 for the real-time cryptanalysis UI with live streaming logs
+```
+
+**Option B — CLI Execution (File input):**
 ```bash
 echo "RSA Challenge:\nN = 1234...\ne = 56789...\nc = 9876...\nRecover the flag." > inputs/prompt.txt
 python solve.py
 ```
 
-**Option B — Pass it as a CLI argument:**
+**Option C — CLI Argument:**
 ```bash
 python solve.py "RSA Challenge: N=... e=... c=... Recover the flag."
 ```
 
-**Option C — Interactive input:**
+**Option D — Standalone Cryptanalysis Suites:**
 ```bash
-python solve.py
-# Paste your challenge, type DONE when finished
+# Run standalone RSA Cryptanalysis & LLL Engine
+python rsa_cryptanalysis.py
+
+# Run standalone Classical Cryptanalysis Suite
+python classical_crypto.py
 ```
 
-Results are saved to `outputs/flag.txt` and `outputs/exploit.py`.
+**Option E — Direct REST API:**
+```bash
+# Classical cipher solver
+curl -X POST http://localhost:5000/api/classical -H "Content-Type: application/json" -d "{\"text\": \"Khoor Zruog\"}"
+
+# RSA parameter analyzer
+curl -X POST http://localhost:5000/api/rsa -H "Content-Type: application/json" -d "{\"text\": \"N = 899\ne = 11\nc = 40\"}"
+```
+
+Results and recovered plaintexts are saved to `outputs/result.txt`, `outputs/flag.txt`, and `outputs/exploit.py`.
 
 ---
 
@@ -262,7 +363,7 @@ Results are saved to `outputs/flag.txt` and `outputs/exploit.py`.
 
 ```bash
 python data_generator.py
-# → crypto_dataset.jsonl  (300 verified RSA challenges)
+# → crypto_dataset.jsonl (Verified challenges across RSA, Classical, XOR, and Binary)
 ```
 
 ---

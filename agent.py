@@ -38,59 +38,115 @@ class CryptoAgentState(TypedDict):
     generated_code: Optional[str]
     execution_stdout: Optional[str]
     execution_stderr: Optional[str]
-    captured_flag: Optional[str]
+    captured_flag: Optional[str]     # Keep for backwards compatibility
+    decoded_result: Optional[str]    # Primary decoded output (any format)
     iteration: int
     max_retries: int
-    # ── New: Hash / Encoding Analysis ──────────────────────────────
-    hash_analysis: Optional[dict]   # full report from hash_decoder
+    # ── Pre-Analysis Reports ───────────────────────────────────────
+    hash_analysis: Optional[dict]       # full report from hash_decoder
+    classical_analysis: Optional[dict]  # full report from classical_crypto
+    rsa_analysis: Optional[dict]        # full report from rsa_cryptanalysis
 
 
-# ── Hash / Encoding Detection Node ──────────────────────────────────────────
+# ── Hash, Encoding, Classical & RSA Detection Node ──────────────────────────
 def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
     """
-    Pre-processing node: scans the challenge for encoded / hashed strings,
-    decodes them, checks for double-encoding, and stores the analysis in state.
-    This runs BEFORE the main classify node so its findings are available
-    to the LLM as extra context.
+    Pre-processing node:
+    1. Scans challenge for encoded / hashed strings (Base64, Hex, Morse, hashes).
+    2. Runs automated Classical Cryptanalysis ONLY on non-RSA / non-math ciphertexts.
+    3. Runs automated RSA Cryptanalysis (Wiener, Fermat, Small e, Common Modulus, etc.)
+       when mathematical RSA parameters (N, e, c) are detected.
+    Only short-circuits if a genuine verified flag is discovered.
     """
-    print("\n🔎 [Pre-Step] Scanning for Hash / Encoding patterns…")
+    print("\n🔎 [Pre-Step] Scanning for Hash / Encoding / Classical / RSA patterns…")
+    challenge = state["challenge"]
+    
+    # Check if this is an asymmetric / mathematical RSA challenge
+    is_math_rsa = bool(
+        re.search(r'\b(N\s*=|modulus|e\s*=|c\s*=|d\s*=|p\s*=|q\s*=|phi\s*=)\b', challenge, re.IGNORECASE)
+        and re.search(r'\d{10,}', challenge)
+    )
+
+    # 1. Encoding & Hash Detection
     try:
         from hash_decoder import analyze_hash_or_encoding, extract_encoded_strings
-        challenge = state["challenge"]
-
-        # 1. Analyse the whole challenge text
         full_analysis = analyze_hash_or_encoding(challenge)
-
-        # 2. Also try to extract individual encoded substrings
         sub_analyses = extract_encoded_strings(challenge)
-
-        analysis = {
+        hash_analysis = {
             "full": full_analysis,
-            "substrings": sub_analyses[:5],   # cap at 5 candidates
+            "substrings": sub_analyses[:5],
         }
-
-        # Pretty-print summary
         summary = full_analysis.get("summary", "")
-        total_layers = full_analysis.get("total_layers", 0)
-        is_double = full_analysis.get("is_double_encoded", False)
-        final_decoded = full_analysis.get("final_decoded", "")
-
-        print(f"  📊 Summary      : {summary}")
-        print(f"  🔢 Layers       : {total_layers}")
-        print(f"  🔁 Double-enc   : {'Yes ⚠️' if is_double else 'No'}")
-        if final_decoded and final_decoded != challenge.strip():
-            print(f"  ✅ Decoded      : {final_decoded[:120]}")
-
-        # Emit extra context for substring hits
-        for idx, sub in enumerate(sub_analyses[:3], 1):
-            print(f"  🔍 Substring #{idx}: [{sub['encoding_layers'][0]['encoding']}] "
-                  f"→ {(sub.get('final_decoded') or '')[:80]}")
-
+        if summary and not is_math_rsa:
+            print(f"  📊 Hash/Encoding: {summary}")
     except Exception as e:
         print(f"  ⚠️ Hash/Encoding detection error: {e}")
-        analysis = {"full": {}, "substrings": [], "error": str(e)}
+        hash_analysis = {"full": {}, "substrings": [], "error": str(e)}
 
-    return {"hash_analysis": analysis}
+    # 2. Classical Cryptanalysis Suite (skip on large-integer RSA/math challenges)
+    classical_res = {}
+    rsa_res = {}
+    verified_flag = None
+    solved_category = "Classical Cryptography"
+    solved_attack = "Direct Cryptanalysis"
+    solved_code = ""
+
+    if not is_math_rsa:
+        try:
+            from classical_crypto import analyze_and_solve_classical
+            candidate_text = hash_analysis.get("full", {}).get("final_decoded") or challenge
+            classical_res = analyze_and_solve_classical(candidate_text)
+            
+            top = classical_res.get("top_match")
+            ioc = classical_res.get("index_of_coincidence", 0)
+            if top and top.get("decrypted", "").strip() != challenge.strip():
+                print(f"  📈 Classical IoC: {ioc} | Top Cipher: {top.get('cipher')}")
+            
+            flag_pattern = classical_res.get("flag_pattern")
+            if flag_pattern and flag_pattern.lower() not in challenge.lower():
+                verified_flag = flag_pattern
+                cipher_name = top.get('cipher', 'Classical')
+                key_info = top.get('key', '')
+                solved_category = "Classical Cryptography"
+                solved_attack = cipher_name
+                solved_code = f"# Solved directly via classical_crypto ({cipher_name})\nprint('{verified_flag}')\n"
+                print(f"  🚩 VERIFIED FLAG RECOVERED via {cipher_name} (Key: {key_info}): {verified_flag}")
+        except Exception as e:
+            print(f"  ⚠️ Classical cryptanalysis error: {e}")
+    else:
+        print("  🔢 Mathematical / RSA parameters detected — executing RSA Cryptanalysis Suite…")
+        try:
+            from rsa_cryptanalysis import analyze_and_solve_rsa
+            rsa_res = analyze_and_solve_rsa(challenge)
+            if rsa_res.get("status") == "solved" and rsa_res.get("flag"):
+                pt = rsa_res["flag"]
+                atk = rsa_res.get("attack", "RSA Analysis")
+                verified_flag = pt
+                solved_category = "RSA"
+                solved_attack = atk
+                solved_code = f"# Solved directly via rsa_cryptanalysis ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED RSA FLAG RECOVERED via {atk}: {pt}")
+            else:
+                print(f"  ℹ️ RSA Analysis initialized. Modulus size: {rsa_res.get('parameters', {}).get('n', 0).bit_length() if rsa_res.get('parameters') else '?'} bits.")
+        except Exception as e:
+            print(f"  ⚠️ RSA cryptanalysis error: {e}")
+            rsa_res = {"status": "error", "error": str(e)}
+
+    result_dict = {
+        "hash_analysis": hash_analysis,
+        "classical_analysis": classical_res,
+        "rsa_analysis": rsa_res
+    }
+    # Only short-circuit if a genuine verified flag was recovered
+    if verified_flag:
+        result_dict["captured_flag"] = verified_flag
+        result_dict["decoded_result"] = verified_flag
+        result_dict["generated_code"] = solved_code
+        result_dict["execution_stdout"] = f"🚩 FLAG: {verified_flag}"
+        result_dict["category"] = solved_category
+        result_dict["attack_hypothesis"] = solved_attack
+
+    return result_dict
 
 
 # --- Nodes ---
@@ -127,16 +183,76 @@ def classify_and_plan(state: CryptoAgentState) -> dict:
             if fd:
                 hash_ctx += f"\n  - Extracted [{enc0}] substring decoded: {fd[:80]}"
 
+    # Check if challenge is primarily mathematical RSA / asymmetric
+    challenge_text = state['challenge']
+    is_math_rsa = bool(
+        re.search(r'\b(N\s*=|modulus|e\s*=|c\s*=|d\s*=|p\s*=|q\s*=|phi\s*=)\b', challenge_text, re.IGNORECASE)
+        and re.search(r'\d{10,}', challenge_text)
+    )
+
+    # Inject RSA cryptanalysis pre-analysis
+    rsa_ctx = ""
+    ra = state.get("rsa_analysis") or {}
+    if ra and ra.get("status") != "error":
+        params = ra.get("parameters") or {}
+        n_val = params.get("n")
+        e_val = params.get("e")
+        if n_val:
+            rsa_ctx = f"\n[RSA Parameters Detected]\n  - Modulus size: {n_val.bit_length()} bits\n  - Public exponent e: {e_val}"
+            if ra.get("attack") and ra["attack"] != "None":
+                rsa_ctx += f"\n  - Suggested RSA Attack: {ra['attack']}"
+
+    # Inject classical cryptanalysis pre-analysis ONLY if it's not an RSA/asymmetric challenge
+    classical_ctx = ""
+    ca = state.get("classical_analysis") or {}
+    if not is_math_rsa and ca.get("top_match"):
+        top = ca["top_match"]
+        dec_sample = str(top.get('decrypted', '')).strip()
+        if dec_sample and dec_sample != challenge_text.strip():
+            ioc = ca.get("index_of_coincidence", 0)
+            chi = ca.get("chi_squared", 0)
+            common = ", ".join(ca.get("most_common_letters", [])[:5])
+            k_factors = ca.get("kasiski_factors", [])
+            k_str = f"  - Kasiski key length candidates: {k_factors}\n" if k_factors else ""
+            classical_ctx = (
+                f"\n[Classical Cryptanalysis Pre-Analysis]\n"
+                f"  - Index of Coincidence (IoC): {ioc} (English ~0.0667, Polyalphabetic/Random ~0.0385)\n"
+                f"  - Chi-Squared: {chi}\n"
+                f"  - High frequency letters: {common}\n"
+                f"{k_str}"
+                f"  - Top Suggested Cipher: {top.get('cipher')} (Key/Params: {top.get('key')})\n"
+                f"  - Decrypted Preview: {dec_sample[:120]}"
+            )
+
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are an expert cryptographic security auditor and CTF player.
 Analyze the given parameters and determine the vulnerability.
 
 Key CTF Rules of Thumb:
-RSA:
-- If e is very large (hundreds of digits, comparable to N): Vulnerable to Wiener's Continued Fractions attack (small private exponent d < (1/3)*N^0.25) or Boneh-Durfee.
-- If |p - q| is small: Fermat Factorization (a = isqrt(N)).
-- If e is very small (e=3): Small public exponent / cube root attack.
-- If multiple (e1, c1) and (e2, c2) share modulus N: Common modulus extended GCD.
+RSA & Asymmetric Attacks:
+- Wiener Attack: large e comparable to N (e > N^0.5, small private d < (1/3)*N^0.25).
+- Boneh-Durfee Attack: small private exponent d < N^0.292 beyond Wiener bound via LLL lattice.
+- Fermat Factorization: primes are close (|p - q| < N^0.25 or isqrt(N)).
+- Small Public Exponent (e=3, 5): integer e-th root when m^e < N without modular wrap.
+- Håstad Broadcast Attack: e recipients with same e and distinct N_i; recover m via CRT and e-th root.
+- Common Modulus Attack: same N, coprime exponents e1, e2; recover m via Extended GCD (Bezout).
+- Franklin-Reiter Attack: related messages m2 = a*m1 + b mod N via polynomial GCD.
+- Coppersmith Small-Root Attack: stereotyped message padding recovery (|x| < N^(1/e)) via LLL lattice.
+- Pollard's p-1: p-1 is B-smooth.
+- Pollard's Rho: general integer factorization via cycle detection.
+- Trial Division: factors with small primes.
+- ROCA (CVE-2017-15361): vulnerable Infineon key generation (p = k*M + 65537^a mod M).
+- Bellcore CRT Fault Attack: differential fault in RSA-CRT signature (gcd(s - s', N)).
+Classical Ciphers:
+- Caesar / ROT13: single shift across 1-25. If ROT47: shifts ASCII 33-126.
+- Affine: C = (a*P + b) mod 26 where gcd(a,26)=1. Brute-force 312 keys or use 2 known letter pairs.
+- Vigenère: polyalphabetic substitution. Key length deduced via Kasiski examination and IoC; solve columns with frequency analysis.
+- Atbash: reciprocal alphabet reversal (A<->Z, B<->Y).
+- Monoalphabetic Substitution: arbitrary 26-letter permutation; crack via frequency analysis and quadgram hill climbing.
+- Playfair: 5x5 key square (combines I/J); pairs of letters encrypted by row, column, or rectangle rules.
+- Hill Cipher: linear algebra mod 26. Invert key matrix mod 26 or solve K = P^(-1) * C mod 26.
+- Rail Fence / Transposition: letters rearranged in zig-zag rails or columns without changing letter values.
+- Crib Dragging / Two-Time Pad: two ciphertexts XOR'd with same keystream (C1 XOR C2 = P1 XOR P2); drag crib to expose text.
 XOR:
 - If ciphertext XOR'd with a repeating or single-byte key: use frequency analysis or brute-force key.
 - If two ciphertexts share the same key (many-time pad): XOR them together to cancel the key, then crib-drag.
@@ -157,10 +273,12 @@ General:
 Challenge:
 {state['challenge']}
 {hash_ctx}
+{rsa_ctx}
+{classical_ctx}
 {previous_failure}
 
 Analyze:
-1. Category (RSA, AES, ECC, Lattice, PRNG, Hash, XOR, Binary, Encoding)
+1. Category (RSA, Classical, AES, ECC, Lattice, PRNG, Hash, XOR, Binary, Encoding)
 2. Underlying Mathematical Flaw / Attack
 3. Engine: "python" or "sage"
 
@@ -234,6 +352,46 @@ def generate_solver(state: CryptoAgentState) -> dict:
             if fd and fd != state["challenge"].strip():
                 hash_hint += f"\nPre-decoded value available: {fd[:200]}"
 
+    # Inject classical cryptanalysis hints into the solver prompt
+    classical_hint = ""
+    ca = state.get("classical_analysis") or {}
+    if ca.get("top_match"):
+        top = ca["top_match"]
+        classical_hint = (
+            f"\n[Classical Cryptanalysis Hint]\n"
+            f"Likely Cipher: {top.get('cipher')}\n"
+            f"Candidate Key/Parameters: {top.get('key')}\n"
+            f"Top Decrypted Guess: {str(top.get('decrypted', ''))[:150]}\n"
+            f"Available importable helpers from classical_crypto:\n"
+            f"  - caesar_bruteforce(ct), caesar_decrypt(ct, shift)\n"
+            f"  - affine_bruteforce(ct), affine_decrypt(ct, a, b), affine_known_plaintext(p1, c1, p2, c2)\n"
+            f"  - vigenere_solve(ct), vigenere_decrypt(ct, key)\n"
+            f"  - atbash(ct), rot13(ct), rot47(ct)\n"
+            f"  - solve_monoalphabetic_substitution(ct), substitution_decrypt(ct, key)\n"
+            f"  - playfair_decrypt(ct, key), generate_playfair_matrix(key)\n"
+            f"  - hill_decrypt_2x2(ct, key_matrix), hill_known_plaintext_2x2(p, c), hill_bruteforce_2x2(ct)\n"
+            f"  - rail_fence_bruteforce(ct), rail_fence_decrypt(ct, rails)\n"
+            f"  - columnar_transposition_bruteforce(ct), columnar_transposition_decrypt(ct, key)\n"
+            f"  - xor_single_byte_bruteforce(ct), xor_single_byte(data, key)\n"
+            f"  - repeating_key_xor_solve(ct), xor_repeating_key(data, key)\n"
+            f"  - known_plaintext_xor(ct, pt, offset), recover_repeating_xor_key(ct, pt, offset, key_len)\n"
+            f"  - crib_drag(c1, c2, crib)\n"
+            f"  - frequency_analysis(ct), kasiski_examination(ct), index_of_coincidence(ct), score_text_english(ct)"
+        )
+
+    # Inject RSA hints into the solver prompt
+    rsa_hint = ""
+    ra = state.get("rsa_analysis") or {}
+    if ra and ra.get("status") != "error":
+        rsa_hint = (
+            f"\n[RSA Mathematics & Cryptanalysis Helpers Available in rsa_cryptanalysis]\n"
+            f"You can import and use:\n"
+            f"  from rsa_cryptanalysis import RSAMath, RSAAttacks, LatticeLLL, analyze_and_solve_rsa\n"
+            f"  - RSAMath: gcd, lcm, xgcd, modinv, modpow, iroot, is_square, euler_phi, carmichael_lambda, crt, continued_fractions, convergents, clean_flag_or_text\n"
+            f"  - RSAAttacks: attack_wiener, attack_boneh_durfee, attack_common_modulus, attack_hastad_broadcast, attack_small_exponent_root, factor_fermat, factor_trial_division, factor_pollard_rho, factor_pollard_p_minus_1, attack_franklin_reiter, attack_coppersmith_stereotyped, private_key_recovery, detect_roca, factor_roca\n"
+            f"  - LatticeLLL: reduce(basis, delta=0.75)"
+        )
+
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a solver generator for cryptographic CTFs.
 Write a standalone, self-contained {engine_name} script that executes the exploit and prints the flag.
@@ -244,6 +402,8 @@ Challenge:
 
 Attack Strategy: {state.get('attack_hypothesis')}
 {hash_hint}
+{rsa_hint}
+{classical_hint}
 {feedback}
 
 Output the code block:
@@ -274,20 +434,33 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
     flag_match = re.search(r"(flag\{.*?\}|CTF\{.*?\})", stdout, re.IGNORECASE)
     flag = flag_match.group(1) if flag_match else None
 
+    # Decoded result: extract flag{} format if present, or clean stdout text if successful
+    decoded_res = None
     if flag:
-        print(f"🚩 FLAG CAPTURED: {flag}")
+        decoded_res = flag
+    elif res["exit_code"] == 0 and stdout.strip():
+        lines = [line.strip() for line in stdout.strip().splitlines() if line.strip()]
+        if lines:
+            candidate = lines[-1] if len(lines) > 1 and ("error" not in lines[-1].lower()) else "\n".join(lines)
+            # Ensure the output is NOT simply echoing the input challenge text
+            if candidate != state["challenge"].strip():
+                decoded_res = candidate
+
+    if decoded_res:
+        print(f"✨ DECODED RESULT:\n{decoded_res}")
     else:
-        print("❌ No flag captured on this attempt.")
+        print("❌ No decoded result captured on this attempt.")
 
     return {
         "execution_stdout": stdout,
-        "execution_stderr": stderr if (res["exit_code"] != 0 or not flag) else "",
-        "captured_flag": flag,
+        "execution_stderr": stderr if (res["exit_code"] != 0 or not decoded_res) else "",
+        "captured_flag": decoded_res,
+        "decoded_result": decoded_res,
         "iteration": state["iteration"] + 1
     }
 
 def evaluation_router(state: CryptoAgentState) -> str:
-    if state.get("captured_flag"):
+    if state.get("decoded_result") or state.get("captured_flag"):
         return END
     if state["iteration"] >= state["max_retries"]:
         return END
@@ -298,13 +471,17 @@ def evaluation_router(state: CryptoAgentState) -> str:
 
 # --- Graph Assembly ---
 builder = StateGraph(CryptoAgentState)
-builder.add_node("hash_detect",    detect_hash_or_encoding)   # ← NEW pre-step
+builder.add_node("hash_detect",    detect_hash_or_encoding)   # Pre-step: Hash, Encoding & Statistical Analysis
 builder.add_node("classify",       classify_and_plan)
 builder.add_node("generate_solver",generate_solver)
 builder.add_node("execute_docker", execute_in_docker)
 
-builder.set_entry_point("hash_detect")                        # ← starts here now
-builder.add_edge("hash_detect",    "classify")                # ← then classify
+builder.set_entry_point("hash_detect")
+# Only short-circuit directly to END if a verified flag was discovered in the pre-step
+builder.add_conditional_edges("hash_detect", lambda s: END if s.get("captured_flag") else "classify", {
+    END:        END,
+    "classify": "classify"
+})
 builder.add_edge("classify",       "generate_solver")
 builder.add_edge("generate_solver","execute_docker")
 builder.add_conditional_edges("execute_docker", evaluation_router, {

@@ -106,17 +106,23 @@ def main():
     state = {"challenge": challenge_text}
     result = crypto_solver_agent.invoke(state)
 
-    flag = result.get("captured_flag")
+    decoded_res = result.get("decoded_result") or result.get("captured_flag")
+    if decoded_res and decoded_res.strip() == challenge_text.strip():
+        decoded_res = None
+
     exploit_code = result.get("generated_code")
 
     print("\n" + "=" * 60)
-    if flag:
-        print(f"🎉 SUCCESS! Captured Flag:\n   {flag}")
-        # Save flag to outputs/flag.txt
+    if decoded_res:
+        print(f"🎉 SUCCESS! Decoded Result:\n   {decoded_res}")
+        # Save to outputs/result.txt and outputs/flag.txt
+        with open(OUTPUTS_DIR / "result.txt", "w", encoding="utf-8") as f:
+            f.write(decoded_res + "\n")
         with open(OUTPUTS_DIR / "flag.txt", "w", encoding="utf-8") as f:
-            f.write(flag + "\n")
+            f.write(decoded_res + "\n")
+        print(f"💾 Decoded result saved to: outputs/result.txt")
     else:
-        print("⚠️ Failed to capture flag within retry limit.")
+        print("⚠️ Failed to produce decoded result within retry limit.")
 
     # Save generated exploit code
     if exploit_code:

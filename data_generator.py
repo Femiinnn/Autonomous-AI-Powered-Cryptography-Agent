@@ -169,6 +169,99 @@ print(long_to_bytes(m).decode(errors='ignore'))
             "solution_code": solution.strip()
         }
 
+    @staticmethod
+    def generate_rsa_small_exponent(cid: int) -> dict:
+        """Low public exponent attack: e=3 and m^3 < N (no modular wrap)."""
+        p = getPrime(512)
+        q = getPrime(512)
+        n = p * q
+        e = 3
+        flag = f"flag{{rsa_cube_root_{cid}_{random.randint(1000, 9999)}}}"
+        m = bytes_to_long(flag.encode())
+        c = pow(m, e, n)
+
+        problem = f"RSA Low Public Exponent Challenge:\nN = {n}\ne = {e}\nc = {c}\nRecover the decrypted flag."
+        solution = f"""
+from rsa_cryptanalysis import RSAAttacks
+res = RSAAttacks.attack_small_exponent_root({c}, {e}, {n})
+print(res['plaintext'])
+"""
+        return {
+            "id": f"rsa_small_e_{cid}",
+            "category": "RSA",
+            "attack_type": "Low Public Exponent (Integer Root)",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip()
+        }
+
+    @staticmethod
+    def generate_rsa_hastad_broadcast(cid: int) -> dict:
+        """Håstad Broadcast attack: e=3 recipients with same message m."""
+        e = 3
+        flag = f"flag{{rsa_hastad_{cid}_{random.randint(1000, 9999)}}}"
+        m = bytes_to_long(flag.encode())
+        moduli = []
+        cts = []
+        for _ in range(e):
+            p = getPrime(256)
+            q = getPrime(256)
+            moduli.append(p * q)
+            cts.append(pow(m, e, p * q))
+
+        problem = (
+            f"RSA Broadcast Transmission (e=3):\n"
+            f"N1 = {moduli[0]}\nc1 = {cts[0]}\n"
+            f"N2 = {moduli[1]}\nc2 = {cts[1]}\n"
+            f"N3 = {moduli[2]}\nc3 = {cts[2]}\n"
+            f"e = {e}\nRecover the secret flag."
+        )
+        solution = f"""
+from rsa_cryptanalysis import RSAAttacks
+mods = {moduli}
+cts = {cts}
+res = RSAAttacks.attack_hastad_broadcast(mods, cts, {e})
+print(res['plaintext'])
+"""
+        return {
+            "id": f"rsa_hastad_{cid}",
+            "category": "RSA",
+            "attack_type": "Hastad Broadcast",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip()
+        }
+
+    @staticmethod
+    def generate_rsa_trial_division(cid: int) -> dict:
+        """Modulus N has a very small prime factor easily found by trial division."""
+        small_p = getPrime(16)
+        large_q = getPrime(512)
+        n = small_p * large_q
+        e = 65537
+        flag = f"flag{{rsa_small_factor_{cid}_{random.randint(1000, 9999)}}}"
+        m = bytes_to_long(flag.encode())
+        c = pow(m, e, n)
+
+        problem = f"RSA Weak Factorization Challenge:\nN = {n}\ne = {e}\nc = {c}\nRecover the plaintext flag."
+        solution = f"""
+from rsa_cryptanalysis import RSAAttacks
+p, q = RSAAttacks.factor_trial_division({n}, limit=100000)
+res = RSAAttacks.private_key_recovery(p, q, {e}, {c})
+print(res['plaintext'])
+"""
+        return {
+            "id": f"rsa_trial_div_{cid}",
+            "category": "RSA",
+            "attack_type": "Trial Division (Small Prime Factor)",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip()
+        }
+
     # ── XOR Challenges ───────────────────────────────────────────────────────
 
     @staticmethod
@@ -393,24 +486,153 @@ print(long_to_bytes(secret).decode('ascii', errors='ignore'))
             "solution_code": solution.strip(),
         }
 
+    # ── Classical Cryptanalysis Challenges ───────────────────────────────────
+
+    @staticmethod
+    def generate_classical_caesar(cid: int) -> dict:
+        """Caesar cipher challenge with random shift 1-25."""
+        from classical_crypto import caesar_encrypt
+        shift = random.randint(1, 25)
+        flag = f"flag{{caesar_shift_{shift}_{cid}_{random.randint(1000, 9999)}}}"
+        problem_text = f"Welcome to the CTF! The secret message is: {flag}"
+        ciphertext = caesar_encrypt(problem_text, shift)
+        problem = f"Classical Cryptanalysis Challenge (Caesar Cipher):\nCiphertext:\n{ciphertext}\nRecover the plaintext flag."
+        solution = f"""\
+from classical_crypto import caesar_decrypt
+ct = "{ciphertext}"
+print(caesar_decrypt(ct, {shift}))
+"""
+        return {
+            "id": f"classical_caesar_{cid}",
+            "category": "Classical",
+            "attack_type": "Caesar Cipher Brute Force",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_classical_affine(cid: int) -> dict:
+        """Affine cipher challenge with random coprime 'a' and shift 'b'."""
+        from classical_crypto import affine_encrypt, COPRIMES_26
+        a = random.choice([c for c in COPRIMES_26 if c != 1])
+        b = random.randint(1, 25)
+        flag = f"flag{{affine_key_{a}_{b}_{cid}_{random.randint(1000, 9999)}}}"
+        problem_text = f"Secret transmission: {flag}"
+        ciphertext = affine_encrypt(problem_text, a, b)
+        problem = f"Classical Cryptanalysis Challenge (Affine Cipher):\nCiphertext:\n{ciphertext}\nRecover the plaintext flag."
+        solution = f"""\
+from classical_crypto import affine_decrypt
+ct = "{ciphertext}"
+print(affine_decrypt(ct, {a}, {b}))
+"""
+        return {
+            "id": f"classical_affine_{cid}",
+            "category": "Classical",
+            "attack_type": "Affine Cipher Brute Force",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_classical_vigenere(cid: int) -> dict:
+        """Polyalphabetic Vigenère cipher challenge."""
+        from classical_crypto import vigenere_encrypt
+        words = ["CIPHER", "CRYPTO", "SECRET", "ENIGMA", "KEYWORD", "MATRIX"]
+        key = random.choice(words)
+        flag = f"flag{{vigenere_key_{key.lower()}_{cid}_{random.randint(1000, 9999)}}}"
+        problem_text = f"Top secret intel for agent: {flag}. The flag will grant you full access."
+        ciphertext = vigenere_encrypt(problem_text, key)
+        problem = f"Classical Cryptanalysis Challenge (Vigenère Cipher):\nCiphertext:\n{ciphertext}\nRecover the plaintext flag."
+        solution = f"""\
+from classical_crypto import vigenere_decrypt
+ct = "{ciphertext}"
+print(vigenere_decrypt(ct, "{key}"))
+"""
+        return {
+            "id": f"classical_vigenere_{cid}",
+            "category": "Classical",
+            "attack_type": "Vigenère Polyalphabetic Analysis",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_classical_atbash(cid: int) -> dict:
+        """Atbash reciprocal substitution challenge."""
+        from classical_crypto import atbash
+        flag = f"flag{{atbash_reverse_{cid}_{random.randint(1000, 9999)}}}"
+        problem_text = f"Intercepted message: {flag}"
+        ciphertext = atbash(problem_text)
+        problem = f"Classical Cryptanalysis Challenge (Atbash Cipher):\nCiphertext:\n{ciphertext}\nRecover the plaintext flag."
+        solution = f"""\
+from classical_crypto import atbash
+ct = "{ciphertext}"
+print(atbash(ct))
+"""
+        return {
+            "id": f"classical_atbash_{cid}",
+            "category": "Classical",
+            "attack_type": "Atbash Cipher Substitution",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_classical_rail_fence(cid: int) -> dict:
+        """Rail fence (zig-zag) transposition challenge."""
+        from classical_crypto import rail_fence_encrypt
+        rails = random.randint(3, 6)
+        flag = f"flag{{rail_fence_{rails}_{cid}_{random.randint(1000, 9999)}}}"
+        problem_text = f"Top secret zig zag transposition: {flag}"
+        ciphertext = rail_fence_encrypt(problem_text, rails)
+        problem = f"Classical Cryptanalysis Challenge (Rail Fence Cipher):\nCiphertext:\n{ciphertext}\nRecover the plaintext flag."
+        solution = f"""\
+from classical_crypto import rail_fence_decrypt
+ct = "{ciphertext}"
+print(rail_fence_decrypt(ct, {rails}))
+"""
+        return {
+            "id": f"classical_rail_fence_{cid}",
+            "category": "Classical",
+            "attack_type": "Rail Fence Transposition",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
 
 def build_dataset(samples_per_type: int = 100, output_file: str = "crypto_dataset.jsonl"):
     gen = CryptoDatasetGenerator()
     dataset = []
 
     for i in range(samples_per_type):
-        # Existing RSA challenges
+        # RSA challenges
         dataset.append(gen.generate_rsa_wiener(i))
         dataset.append(gen.generate_rsa_common_modulus(i))
         dataset.append(gen.generate_rsa_fermat(i))
-        # New XOR challenges
+        # XOR challenges
         dataset.append(gen.generate_xor_single_byte(i))
         dataset.append(gen.generate_xor_repeating_key(i))
         dataset.append(gen.generate_xor_known_plaintext(i))
-        # New Binary / Bit-manipulation challenges
+        # Binary challenges
         dataset.append(gen.generate_binary_lsb_encode(i))
         dataset.append(gen.generate_binary_bit_rotation(i))
         dataset.append(gen.generate_binary_lsb_oracle(i))
+        # Classical Cryptanalysis challenges
+        dataset.append(gen.generate_classical_caesar(i))
+        dataset.append(gen.generate_classical_affine(i))
+        dataset.append(gen.generate_classical_vigenere(i))
+        dataset.append(gen.generate_classical_atbash(i))
+        dataset.append(gen.generate_classical_rail_fence(i))
 
     random.shuffle(dataset)
     with open(output_file, "w", encoding="utf-8") as f:

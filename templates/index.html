@@ -333,6 +333,14 @@ textarea:focus{
 .att-chip.active{
   border-color:var(--cyan);background:rgba(6,182,212,.1);color:var(--cyan-l);
 }
+.att-section-label{
+  width:100%;font-size:10px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--text-3);margin:12px 0 4px 2px;
+  display:flex;align-items:center;gap:8px;
+}
+.att-section-label::after{
+  content:'';flex:1;height:1px;background:rgba(148,163,184,.08);
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    SUBMIT BUTTON
@@ -524,6 +532,56 @@ textarea:focus{
 }
 .copy-btn:hover{background:rgba(16,185,129,.2);border-color:rgba(16,185,129,.5);}
 
+/* ── All Decoded Results Candidates ── */
+.all-results-wrap{
+  padding:18px 22px;
+  background:rgba(0,0,0,.25);
+  border-top:1px solid rgba(148,163,184,.08);
+}
+.all-results-title{
+  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;
+  color:var(--text-3);margin-bottom:12px;display:flex;align-items:center;gap:6px;
+}
+.candidate-list{
+  display:flex;flex-direction:column;gap:9px;max-height:340px;overflow-y:auto;
+}
+.candidate-item{
+  padding:10px 14px;border-radius:var(--radius-sm);
+  background:rgba(17,21,32,.7);border:1px solid rgba(148,163,184,.1);
+  transition:all var(--transition);
+}
+.candidate-item:hover{
+  border-color:rgba(6,182,212,.3);background:rgba(17,21,32,.95);
+}
+.candidate-item.top{
+  border-color:rgba(16,185,129,.35);background:rgba(16,185,129,.05);
+}
+.candidate-head{
+  display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;
+}
+.candidate-cipher{
+  font-size:12px;font-weight:700;color:var(--cyan-l);display:flex;align-items:center;gap:7px;
+}
+.candidate-key{
+  font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--amber);background:rgba(245,158,11,.1);padding:2px 7px;border-radius:4px;
+}
+.candidate-score{
+  font-size:11px;color:var(--text-3);font-family:'JetBrains Mono',monospace;
+}
+.candidate-body{
+  font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-1);
+  word-break:break-all;line-height:1.5;background:rgba(0,0,0,.3);padding:8px 10px;border-radius:5px;
+}
+.candidate-actions{
+  display:flex;justify-content:flex-end;margin-top:6px;
+}
+.candidate-copy-btn{
+  background:none;border:1px solid rgba(148,163,184,.15);border-radius:4px;
+  color:var(--text-3);font-size:10px;padding:3px 9px;cursor:pointer;
+  transition:all var(--transition);
+}
+.candidate-copy-btn:hover{color:var(--emerald-l);border-color:rgba(16,185,129,.4);}
+
 /* ── Attack summary pills ── */
 .summary-row{
   display:flex;flex-wrap:wrap;gap:7px;
@@ -683,6 +741,42 @@ textarea:focus{
 .how-desc{font-size:13px;color:var(--text-2);line-height:1.65;}
 
 /* ══════════════════════════════════════════════════════════════════════════
+   ATTACK CATALOG & MATRIX
+══════════════════════════════════════════════════════════════════════════ */
+.catalog-section{
+  position:relative;z-index:1;
+  max-width:1180px;margin:0 auto 40px;padding:0 20px;
+}
+.catalog-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;
+}
+.catalog-card{
+  padding:22px 20px;border-radius:var(--radius-md);
+  border:1px solid rgba(148,163,184,.08);background:rgba(255,255,255,.022);
+  backdrop-filter:blur(10px);
+  transition:border-color var(--transition),transform var(--transition);
+}
+.catalog-card:hover{border-color:rgba(148,163,184,.2);transform:translateY(-2px);}
+.catalog-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.catalog-title{font-size:15px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:8px;}
+.catalog-badge{
+  font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:999px;font-family:'JetBrains Mono',monospace;
+}
+.badge-rsa{background:rgba(99,102,241,.12);color:var(--violet-ll);border:1px solid rgba(99,102,241,.25);}
+.badge-classical{background:rgba(16,185,129,.12);color:var(--emerald-l);border:1px solid rgba(16,185,129,.25);}
+.badge-block{background:rgba(6,182,212,.12);color:var(--cyan-l);border:1px solid rgba(6,182,212,.25);}
+.badge-hash{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25);}
+.catalog-desc{font-size:12.5px;color:var(--text-2);line-height:1.6;margin-bottom:14px;}
+.catalog-tags{display:flex;flex-wrap:wrap;gap:6px;}
+.catalog-tag{
+  font-size:11px;padding:3px 8px;border-radius:5px;
+  background:rgba(0,0,0,.25);border:1px solid rgba(148,163,184,.09);
+  color:var(--text-2);font-family:'JetBrains Mono',monospace;
+  transition:all var(--transition);
+}
+.catalog-tag:hover{border-color:rgba(148,163,184,.25);color:var(--text-1);background:rgba(255,255,255,.04);}
+
+/* ══════════════════════════════════════════════════════════════════════════
    DIVIDER
 ══════════════════════════════════════════════════════════════════════════ */
 .section-divider{
@@ -730,20 +824,22 @@ textarea:focus{
   <h1>Autonomous Crypto<br/>CTF Solver</h1>
   <p>Paste a cryptographic challenge. The AI agent classifies the vulnerability, generates an exploit, and executes it in a secure sandbox — automatically.</p>
   <div class="hero-tags">
-    <span class="htag">RSA · AES · ECC · Lattice</span>
-    <span class="htag">Wiener · Fermat · Common Modulus</span>
+    <span class="htag">15 RSA Attacks &amp; LLL Lattice</span>
+    <span class="htag">18 Classical &amp; XOR Methods</span>
+    <span class="htag">AES · ECC · PRNG · Hashes</span>
     <span class="htag">Docker Sandbox</span>
-    <span class="htag">SageMath Engine</span>
-    <span class="htag">Self-correcting Loop</span>
+    <span class="htag">SageMath + gmpy2</span>
+    <span class="htag">Self-Correcting Loop</span>
   </div>
 </section>
 
 <!-- ── Stats Strip ────────────────────────────────────────────────────────── -->
 <div class="stats-strip">
-  <div class="stat"><div class="stat-num">9+</div><div class="stat-label">Attack Types</div></div>
+  <div class="stat"><div class="stat-num">33+</div><div class="stat-label">Attack Types</div></div>
+  <div class="stat"><div class="stat-num">15</div><div class="stat-label">RSA Attacks</div></div>
+  <div class="stat"><div class="stat-num">18</div><div class="stat-label">Classical Methods</div></div>
+  <div class="stat"><div class="stat-num">12+</div><div class="stat-label">Encoding Layers</div></div>
   <div class="stat"><div class="stat-num">4</div><div class="stat-label">Retry Loops</div></div>
-  <div class="stat"><div class="stat-num">300</div><div class="stat-label">Training Samples</div></div>
-  <div class="stat"><div class="stat-num">RL</div><div class="stat-label">GRPO Trained</div></div>
 </div>
 
 <!-- ── Main Grid ──────────────────────────────────────────────────────────── -->
@@ -803,41 +899,75 @@ textarea:focus{
         <div class="cat-grid" id="cat-grid">
           <label class="cat-card active" data-val="auto"><input type="radio" name="category" value="auto" checked /><span class="cat-emoji">🤖</span><span class="cat-name">Auto</span></label>
           <label class="cat-card" data-val="RSA"><input type="radio" name="category" value="RSA" /><span class="cat-emoji">🔑</span><span class="cat-name">RSA</span></label>
+          <label class="cat-card" data-val="Classical"><input type="radio" name="category" value="Classical" /><span class="cat-emoji">📜</span><span class="cat-name">Classical</span></label>
+          <label class="cat-card" data-val="XOR"><input type="radio" name="category" value="XOR" /><span class="cat-emoji">⊕</span><span class="cat-name">XOR</span></label>
           <label class="cat-card" data-val="AES"><input type="radio" name="category" value="AES" /><span class="cat-emoji">🛡️</span><span class="cat-name">AES</span></label>
           <label class="cat-card" data-val="ECC"><input type="radio" name="category" value="ECC" /><span class="cat-emoji">📐</span><span class="cat-name">ECC</span></label>
           <label class="cat-card" data-val="Lattice"><input type="radio" name="category" value="Lattice" /><span class="cat-emoji">🕸️</span><span class="cat-name">Lattice</span></label>
           <label class="cat-card" data-val="PRNG"><input type="radio" name="category" value="PRNG" /><span class="cat-emoji">🎲</span><span class="cat-name">PRNG</span></label>
           <label class="cat-card" data-val="Hash"><input type="radio" name="category" value="Hash" /><span class="cat-emoji">🗜️</span><span class="cat-name">Hash</span></label>
-          <label class="cat-card" data-val="XOR"><input type="radio" name="category" value="XOR" /><span class="cat-emoji">⊕</span><span class="cat-name">XOR</span></label>
-          <label class="cat-card" data-val="Binary"><input type="radio" name="category" value="Binary" /><span class="cat-emoji">🔢</span><span class="cat-name">Binary</span></label>
           <label class="cat-card" data-val="Encoding"><input type="radio" name="category" value="Encoding" /><span class="cat-emoji">🔡</span><span class="cat-name">Encoding</span></label>
+          <label class="cat-card" data-val="Binary"><input type="radio" name="category" value="Binary" /><span class="cat-emoji">🔢</span><span class="cat-name">Binary</span></label>
+          <label class="cat-card" data-val="Custom"><input type="radio" name="category" value="Custom" /><span class="cat-emoji">⚔️</span><span class="cat-name">Custom</span></label>
         </div>
 
         <label class="field-label" style="margin-top:20px;">Attack Strategy</label>
         <div class="attack-wrap" id="attack-wrap">
-          <div class="att-chip active" data-val="auto">🤖 Auto-Detect</div>
-          <div class="att-chip" data-val="Wiener Continued Fractions">📐 Wiener</div>
-          <div class="att-chip" data-val="Fermat Factorization">🔢 Fermat</div>
+          <div class="att-chip active" data-val="auto">🤖 Auto-Detect Strategy</div>
+
+          <div class="att-section-label">RSA Cryptanalysis (15 Attacks &amp; LLL)</div>
+          <div class="att-chip" data-val="Wiener Continued Fractions">📐 Wiener (Small d)</div>
+          <div class="att-chip" data-val="Fermat Factorization">🔢 Fermat (|p-q| small)</div>
+          <div class="att-chip" data-val="Pollard p-1 Factorization">📈 Pollard p-1 (Smooth)</div>
+          <div class="att-chip" data-val="Pollard Rho Factorization">🌀 Pollard Rho</div>
           <div class="att-chip" data-val="Common Modulus Extended GCD">♾️ Common Modulus</div>
-          <div class="att-chip" data-val="Small Public Exponent Cube Root">³√ Small e</div>
-          <div class="att-chip" data-val="Boneh-Durfee Lattice">🧮 Boneh-Durfee</div>
-          <div class="att-chip" data-val="Padding Oracle">💊 Padding Oracle</div>
-          <div class="att-chip" data-val="Pohlig-Hellman">📈 Pohlig-Hellman</div>
-          <div class="att-chip" data-val="Frequency Analysis">🔡 Freq. Analysis</div>
+          <div class="att-chip" data-val="Small Public Exponent Cube Root">³√ Small Exponent (e=3)</div>
+          <div class="att-chip" data-val="Hastad Broadcast Attack">📡 Håstad Broadcast</div>
+          <div class="att-chip" data-val="Franklin-Reiter Related Message">👥 Franklin-Reiter</div>
+          <div class="att-chip" data-val="Coppersmith Stereotyped">🎯 Coppersmith (Roots)</div>
+          <div class="att-chip" data-val="Boneh-Durfee Lattice">🧮 Boneh-Durfee (LLL)</div>
+          <div class="att-chip" data-val="ROCA Detection">🛡️ ROCA (CVE-2017-15361)</div>
+          <div class="att-chip" data-val="Partial Key Exposure">🧩 Partial Key Bits</div>
+          <div class="att-chip" data-val="Bellcore CRT Fault Attack">⚡ CRT Fault Attack</div>
+          <div class="att-chip" data-val="Integer Factorization">🔍 Factoring Recovery</div>
+
+          <div class="att-section-label">Classical Cryptanalysis (18 Methods)</div>
+          <div class="att-chip" data-val="Caesar Cipher Brute Force">🏛️ Caesar Brute Force</div>
+          <div class="att-chip" data-val="Affine Cipher Analysis">🧮 Affine Cipher</div>
+          <div class="att-chip" data-val="Vigenere Cipher Analysis">🔤 Vigenère (IC/Kasiski)</div>
+          <div class="att-chip" data-val="Atbash Cipher">🔄 Atbash Cipher</div>
+          <div class="att-chip" data-val="ROT13 / ROT47">🔀 ROT13 / ROT47</div>
+          <div class="att-chip" data-val="Monoalphabetic Substitution">🔠 Substitution Cipher</div>
+          <div class="att-chip" data-val="Playfair Cipher">🗺️ Playfair Cipher</div>
+          <div class="att-chip" data-val="Hill Cipher Known-Plaintext">📐 Hill Matrix Cipher</div>
+          <div class="att-chip" data-val="Rail Fence Cipher">🛤️ Rail Fence Transposition</div>
+          <div class="att-chip" data-val="Columnar Transposition">📊 Columnar Transposition</div>
+          <div class="att-chip" data-val="Frequency Analysis">📈 Frequency Analysis</div>
+          <div class="att-chip" data-val="Index of Coincidence">📏 Index of Coincidence</div>
+          <div class="att-chip" data-val="Kasiski Examination">🔎 Kasiski Examination</div>
+          <div class="att-chip" data-val="N-gram Quadgram Scoring">📝 N-gram Quadgram</div>
+          <div class="att-chip" data-val="Crib Dragging">🎯 Crib Dragging</div>
+
+          <div class="att-section-label">XOR &amp; Stream Ciphers</div>
           <div class="att-chip" data-val="Single-Byte XOR Brute Force">⊕ Single-Byte XOR</div>
           <div class="att-chip" data-val="Repeating-Key XOR Frequency Analysis">🔁 Repeating-Key XOR</div>
-          <div class="att-chip" data-val="Known-Plaintext XOR Key Recovery">🔓 XOR Known-PT</div>
+          <div class="att-chip" data-val="Known-Plaintext XOR Key Recovery">🔓 Known-PT XOR</div>
           <div class="att-chip" data-val="Many-Time Pad XOR">📑 Many-Time Pad</div>
-          <div class="att-chip" data-val="Binary String Decoding">01 Bin Decode</div>
-          <div class="att-chip" data-val="Bit Rotation Brute Force">🔄 Bit Rotation</div>
+
+          <div class="att-section-label">Block Ciphers &amp; Curves</div>
+          <div class="att-chip" data-val="Padding Oracle">💊 Padding Oracle (AES-CBC)</div>
+          <div class="att-chip" data-val="ECB Byte-at-a-Time">🧱 ECB Byte-at-a-Time</div>
+          <div class="att-chip" data-val="Pohlig-Hellman">📈 Pohlig-Hellman ECC/DLP</div>
           <div class="att-chip" data-val="LSB Oracle Bit Reconstruction">🔮 LSB Oracle</div>
-          <div class="att-chip" data-val="Base64 Decode">📦 Base64</div>
+
+          <div class="att-section-label">Encodings &amp; Hashes</div>
+          <div class="att-chip" data-val="Double Encoding Peel">🧅 Multi-Layer Peel</div>
+          <div class="att-chip" data-val="Base64 Decode">📦 Base64 / Base32 / Base85</div>
           <div class="att-chip" data-val="Hex Decode">🔢 Hex Decode</div>
-          <div class="att-chip" data-val="Double Encoding Peel">🧅 Double Decode</div>
-          <div class="att-chip" data-val="Hash Identification">🔑 Hash ID</div>
-          <div class="att-chip" data-val="ROT13 / Caesar Shift">🔤 ROT13/Caesar</div>
-          <div class="att-chip" data-val="Morse Code Decode">📡 Morse</div>
-          <div class="att-chip" data-val="URL / HTML Decode">🌐 URL/HTML</div>
+          <div class="att-chip" data-val="Binary String Decoding">01 Binary String</div>
+          <div class="att-chip" data-val="Hash Identification">🔑 Hash Identification</div>
+          <div class="att-chip" data-val="Morse Code Decode">📡 Morse Code</div>
+          <div class="att-chip" data-val="URL / HTML Decode">🌐 URL / HTML Decode</div>
         </div>
       </div>
     </div>
@@ -906,19 +1036,21 @@ textarea:focus{
       </div>
     </div>
 
-    <!-- Flag Result Card -->
+    <!-- Decoded Result Card -->
     <div class="card" id="result-card">
       <div class="flag-reveal" id="flag-reveal">
-        <div class="flag-eyebrow" id="flag-eyebrow">Captured Flag</div>
-        <span class="flag-emoji-big" id="flag-emoji">🚩</span>
+        <div class="flag-eyebrow" id="flag-eyebrow">Decoded Output</div>
+        <span class="flag-emoji-big" id="flag-emoji">✨</span>
         <div class="flag-text" id="flag-text"></div>
         <div class="copy-row" id="copy-row">
           <button class="copy-btn" id="copy-btn">
-            <span>📋</span> Copy Flag
+            <span>📋</span> Copy Decoded Result
           </button>
         </div>
       </div>
       <div class="summary-row" id="summary-row" style="display:none"></div>
+      <!-- All Decoded Results (Classical Candidates & Permutations) -->
+      <div class="all-results-wrap" id="all-results-wrap" style="display:none"></div>
       <div class="code-viewer" id="code-viewer" style="display:none">
         <div class="code-topbar">
           <span class="code-lang">python</span>
@@ -949,6 +1081,107 @@ textarea:focus{
 
 </div><!-- /main -->
 
+<!-- ── Attack Categories & Capabilities ───────────────────────────────────── -->
+<div class="section-divider"><span>Supported Attack Categories &amp; Cryptanalysis</span></div>
+<section class="catalog-section">
+  <div class="catalog-grid">
+    
+    <!-- RSA Cryptanalysis -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🔑</span> RSA Cryptanalysis</div>
+        <span class="catalog-badge badge-rsa">15 Attacks + LLL</span>
+      </div>
+      <div class="catalog-desc">
+        Comprehensive integer factorization, low private/public exponents, fault injection, and lattice reduction with pure Python and SageMath/gmpy2 backends.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Wiener (e/d)</span>
+        <span class="catalog-tag">Fermat Factorization</span>
+        <span class="catalog-tag">Pollard p-1 &amp; Rho</span>
+        <span class="catalog-tag">Common Modulus</span>
+        <span class="catalog-tag">Håstad Broadcast</span>
+        <span class="catalog-tag">Franklin-Reiter</span>
+        <span class="catalog-tag">Coppersmith Roots</span>
+        <span class="catalog-tag">Boneh-Durfee LLL</span>
+        <span class="catalog-tag">ROCA CVE-2017-15361</span>
+        <span class="catalog-tag">Partial Key Exposure</span>
+        <span class="catalog-tag">Bellcore CRT Fault</span>
+        <span class="catalog-tag">Continued Fractions</span>
+      </div>
+    </div>
+
+    <!-- Classical Cryptanalysis -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>📜</span> Classical Cryptanalysis</div>
+        <span class="catalog-badge badge-classical">18 Methods</span>
+      </div>
+      <div class="catalog-desc">
+        Full suite of historical ciphers with automated quadgram N-gram scoring, frequency analysis, key length estimation, and matrix algebra.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Caesar Brute Force</span>
+        <span class="catalog-tag">Affine Cipher</span>
+        <span class="catalog-tag">Vigenère Solver</span>
+        <span class="catalog-tag">Atbash</span>
+        <span class="catalog-tag">ROT13 / ROT47</span>
+        <span class="catalog-tag">Monoalphabetic</span>
+        <span class="catalog-tag">Playfair 5x5</span>
+        <span class="catalog-tag">Hill Matrix 2x2/3x3</span>
+        <span class="catalog-tag">Rail Fence</span>
+        <span class="catalog-tag">Columnar Transposition</span>
+        <span class="catalog-tag">Kasiski Examination</span>
+        <span class="catalog-tag">Index of Coincidence</span>
+        <span class="catalog-tag">N-gram Quadgrams</span>
+      </div>
+    </div>
+
+    <!-- XOR & Stream Ciphers -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>⊕</span> XOR &amp; Stream Ciphers</div>
+        <span class="catalog-badge badge-block">XOR &amp; State</span>
+      </div>
+      <div class="catalog-desc">
+        Statistical, byte-frequency, and known-plaintext attacks against stream ciphers, many-time pads, and pseudo-random generators.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Single-Byte XOR</span>
+        <span class="catalog-tag">Repeating-Key XOR</span>
+        <span class="catalog-tag">Known-Plaintext Recovery</span>
+        <span class="catalog-tag">Crib Dragging</span>
+        <span class="catalog-tag">Many-Time Pad (MTP)</span>
+        <span class="catalog-tag">LCG State Recovery</span>
+        <span class="catalog-tag">MT19937 Mersenne</span>
+        <span class="catalog-tag">Bitwise Rotations</span>
+      </div>
+    </div>
+
+    <!-- Modern Ciphers & Encodings -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🛡️</span> Modern &amp; Encodings</div>
+        <span class="catalog-badge badge-hash">Hashes &amp; Oracles</span>
+      </div>
+      <div class="catalog-desc">
+        Block cipher modes, oracle attacks, elliptic curve discrete logarithms, and automated recursive multi-layer encoding stripping.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">AES Padding Oracle</span>
+        <span class="catalog-tag">ECB Byte-at-a-Time</span>
+        <span class="catalog-tag">Pohlig-Hellman DLP</span>
+        <span class="catalog-tag">LSB Oracle Bits</span>
+        <span class="catalog-tag">Base64 / 32 / 85</span>
+        <span class="catalog-tag">Hex &amp; Binary</span>
+        <span class="catalog-tag">Hash ID (MD5/SHA/NTLM)</span>
+        <span class="catalog-tag">Recursive Onion Peel</span>
+      </div>
+    </div>
+
+  </div>
+</section>
+
 <!-- ── How it Works ───────────────────────────────────────────────────────── -->
 <div class="section-divider"><span>How It Works</span></div>
 <section class="how-section">
@@ -973,9 +1206,9 @@ textarea:focus{
     </div>
     <div class="how-card">
       <div class="how-num">Step 04</div>
-      <span class="how-icon">🚩</span>
-      <div class="how-title">Capture the Flag</div>
-      <div class="how-desc">The agent scans stdout for <code style="font-size:11px;color:var(--emerald-l)">flag{…}</code> patterns. On failure, it retries up to 4 times, re-hypothesizing the attack if needed.</div>
+      <span class="how-icon">✨</span>
+      <div class="how-title">Extract Decoded Output</div>
+      <div class="how-desc">The agent extracts any recovered plaintext, secret keys, or decoded flag from execution. On failure, it retries up to 4 times, self-correcting the exploit.</div>
     </div>
   </div>
 </section>
@@ -1168,7 +1401,8 @@ btnSubmit.addEventListener('click', async () => {
       sse.close();
       if (lastStep) setStepDone(lastStep);
       setStepDone('result');
-      pipelineSub.textContent = msg.flag ? '✅ Flag captured!' : '⚠️ Solve failed';
+      const hasDecoded = Boolean(msg.decoded_result || msg.flag || (msg.stdout && msg.stdout.trim()));
+      pipelineSub.textContent = hasDecoded ? '✅ Decoded successfully!' : '⚠️ Solve failed';
       showResult(msg);
       setBusy(false);
     }
@@ -1197,27 +1431,75 @@ function showResult(msg) {
   const sumRow  = document.getElementById('summary-row');
   const codeViewer = document.getElementById('code-viewer');
   const exploitCode = document.getElementById('exploit-code');
+  const allResultsWrap = document.getElementById('all-results-wrap');
 
-  if (msg.flag) {
+  const inputVal = ta.value.trim();
+  let decoded = msg.decoded_result || msg.flag || (msg.stdout && msg.stdout.trim() ? msg.stdout.trim() : null);
+
+  // If the returned text is just echoing the user's input prompt, disregard it
+  if (decoded && inputVal && decoded.trim() === inputVal) {
+    decoded = null;
+  }
+
+  if (decoded) {
     reveal.className = 'flag-reveal';
-    eyebrow.textContent = 'Captured Flag';
-    emoji.textContent = '🚩';
+    eyebrow.textContent = 'Decoded Output';
+    emoji.textContent = '✨';
     text.className = 'flag-text';
-    text.textContent = msg.flag;
+    text.textContent = decoded;
     copyRow.style.display = 'flex';
+    copyBtn.innerHTML = '<span>📋</span> Copy Result';
     copyBtn.onclick = () => {
-      navigator.clipboard.writeText(msg.flag);
+      navigator.clipboard.writeText(decoded);
       copyBtn.innerHTML = '<span>✅</span> Copied!';
-      setTimeout(() => copyBtn.innerHTML = '<span>📋</span> Copy Flag', 1800);
+      setTimeout(() => copyBtn.innerHTML = '<span>📋</span> Copy Result', 1800);
     };
     // summary pills
     sumRow.innerHTML = '';
     sumRow.style.display = 'flex';
     if (selectedCategory() !== 'auto') sumRow.innerHTML += `<span class="sum-pill cat">🏷 ${selectedCategory()}</span>`;
     if (selectedAttack()   !== 'auto') sumRow.innerHTML += `<span class="sum-pill atk">⚔️ ${selectedAttack()}</span>`;
+    if (msg.rsa_info && msg.rsa_info.attack) sumRow.innerHTML += `<span class="sum-pill atk" style="background:rgba(99,102,241,.15);color:var(--violet-ll)">🔑 ${esc(msg.rsa_info.attack)}</span>`;
+    if (msg.classical_info && msg.classical_info.best_cipher) sumRow.innerHTML += `<span class="sum-pill atk" style="background:rgba(16,185,129,.15);color:var(--emerald-l)">📜 ${esc(msg.classical_info.best_cipher)}</span>`;
     sumRow.innerHTML += `<span class="sum-pill eng">🐍 Python</span>`;
   } else {
-    showFailed('No flag found within retry limit.');
+    showFailed('No decoded output found within retry limit.');
+  }
+
+  // Render candidate decoded results (filter out any that simply echo input)
+  const allCands = (msg.classical_info && (msg.classical_info.all_decoded_results || msg.classical_info.ranked_candidates)) || [];
+  const candidates = allCands.filter(c => c && c.decrypted && c.decrypted.trim() !== inputVal);
+  if (candidates && candidates.length > 0) {
+    allResultsWrap.style.display = 'block';
+    let html = `<div class="all-results-title"><span>📚</span> All Decoded Candidates &amp; Permutations (${candidates.length})</div><div class="candidate-list">`;
+    candidates.forEach((c, idx) => {
+      const isTop = (idx === 0);
+      const cipherTitle = c.cipher || 'Candidate';
+      const keyStr = c.key ? `Key: ${c.key}` : '';
+      const scoreStr = (c.score !== undefined && c.score !== null) ? Number(c.score).toFixed(2) : '';
+      const decText = c.decrypted || '';
+      html += `
+        <div class="candidate-item ${isTop ? 'top' : ''}">
+          <div class="candidate-head">
+            <div class="candidate-cipher">
+              ${isTop ? '🏆 ' : ''}${esc(cipherTitle)}
+              ${keyStr ? `<span class="candidate-key">${esc(keyStr)}</span>` : ''}
+            </div>
+            ${scoreStr ? `<div class="candidate-score">Score: ${esc(scoreStr)}</div>` : ''}
+          </div>
+          <div class="candidate-body" id="cand-body-${idx}">${esc(decText)}</div>
+          <div class="candidate-actions">
+            <button class="candidate-copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('cand-body-${idx}').textContent).then(()=>{this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',1400)})">
+              Copy
+            </button>
+          </div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+    allResultsWrap.innerHTML = html;
+  } else {
+    allResultsWrap.style.display = 'none';
   }
 
   if (msg.code && msg.code.trim()) {
@@ -1243,9 +1525,11 @@ function showFailed(msg) {
   document.getElementById('flag-emoji').textContent = '❌';
   const t = document.getElementById('flag-text');
   t.className = 'flag-text failed-text';
-  t.textContent = msg || 'Failed to capture flag.';
+  t.textContent = msg || 'Failed to produce decoded output.';
   document.getElementById('copy-row').style.display = 'none';
   document.getElementById('summary-row').style.display = 'none';
+  const allResultsWrap = document.getElementById('all-results-wrap');
+  if (allResultsWrap) allResultsWrap.style.display = 'none';
 }
 
 /* ── Hash / Encoding Analysis Card renderer ───────────────────────────────── */

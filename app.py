@@ -113,7 +113,7 @@ def solve():
             flag = result.get('captured_flag')
             code = result.get('generated_code', '')
             stdout_out = result.get('execution_stdout', '')
-            # ── Hash / Encoding analysis (new) ──────────────────────────────
+            # ── Hash / Encoding analysis ────────────────────────────────────
             ha = result.get('hash_analysis') or {}
             full_ha = ha.get('full') or {}
             hash_info = {
@@ -144,8 +144,51 @@ def solve():
                     for s in (ha.get('substrings') or [])
                 ]
             }
-            q.put({'type': 'result', 'flag': flag, 'code': code, 'stdout': stdout_out,
-                   'hash_info': hash_info})
+
+            # ── Classical Cryptanalysis analysis ─────────────────────────────
+            ca = result.get('classical_analysis') or {}
+            classical_info = {
+                'index_of_coincidence': ca.get('index_of_coincidence', 0),
+                'chi_squared': ca.get('chi_squared', 0),
+                'most_common_letters': ca.get('most_common_letters', []),
+                'top_match': ca.get('top_match', {}),
+                'decoded_result': ca.get('decoded_result', ''),
+                'all_decoded_results': ca.get('all_decoded_results', []),
+                'ranked_candidates': ca.get('ranked_candidates', [])
+            }
+
+            # Genuine decoded result from agent execution
+            decoded_result = result.get('decoded_result') or result.get('captured_flag')
+
+            # Fallback to script stdout if not already set
+            if not decoded_result and stdout_out.strip():
+                lines = [line.strip() for line in stdout_out.strip().splitlines() if line.strip()]
+                if lines:
+                    cand = lines[-1] if len(lines) > 1 and ("error" not in lines[-1].lower()) else "\n".join(lines)
+                    decoded_result = cand
+
+            # STRICT CHECK: Never treat the raw challenge input as the decoded result!
+            if decoded_result and decoded_result.strip() == full_challenge.strip():
+                decoded_result = None
+
+            # ── RSA Analysis ─────────────────────────────────────────────────
+            ra = result.get('rsa_analysis') or {}
+            rsa_info = {
+                'status': ra.get('status', ''),
+                'attack': ra.get('attack', ''),
+                'flag': ra.get('flag', '')
+            }
+
+            q.put({
+                'type': 'result',
+                'decoded_result': decoded_result,
+                'flag': decoded_result,
+                'code': code,
+                'stdout': stdout_out,
+                'hash_info': hash_info,
+                'classical_info': classical_info,
+                'rsa_info': rsa_info
+            })
         except Exception as exc:
             q.put({'type': 'error', 'message': str(exc)})
         finally:
@@ -181,6 +224,36 @@ def stream(job_id: str):
         mimetype='text/event-stream',
         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
     )
+
+
+@app.route('/api/classical', methods=['POST'])
+def api_classical():
+    """Direct instant Classical Cryptanalysis API endpoint."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '') or request.form.get('text', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide text or ciphertext to analyze.'}), 400
+    try:
+        from classical_crypto import analyze_and_solve_classical
+        res = analyze_and_solve_classical(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/rsa', methods=['POST'])
+def api_rsa():
+    """Direct instant RSA Cryptanalysis API endpoint."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '') or request.form.get('text', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide RSA parameters (N, e, c).'}), 400
+    try:
+        from rsa_cryptanalysis import analyze_and_solve_rsa
+        res = analyze_and_solve_rsa(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 if __name__ == '__main__':
