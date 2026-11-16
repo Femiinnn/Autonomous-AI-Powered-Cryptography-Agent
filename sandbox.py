@@ -41,14 +41,9 @@ class DockerCryptoSandbox:
         try:
             if not self.has_docker:
                 # Fallback to host environment execution with UTF-8 encoding
-                runner = "sage" if is_sage else "python"
-                if runner == "sage" and shutil.which("sage") is None:
-                    return {
-                        "stdout": "",
-                        "stderr": "SageMath is not installed on this machine. Please implement the solver in standard Python 3 using gmpy2, sympy, or pycryptodome.",
-                        "exit_code": 1,
-                        "timed_out": False
-                    }
+                has_sage_native = shutil.which("sage") is not None
+                runner = "sage" if (is_sage and has_sage_native) else "python"
+
                 env = os.environ.copy()
                 env["PYTHONIOENCODING"] = "utf-8"
                 res = subprocess.run(
@@ -62,9 +57,18 @@ class DockerCryptoSandbox:
                     errors="replace",
                     cwd=workdir
                 )
+
+                stderr_out = res.stderr
+                # If execution failed because SageMath was attempted on Python
+                if res.returncode != 0 and ("no module named 'sage'" in stderr_out.lower() or "import sage" in code.lower()):
+                    stderr_out = (
+                        "ModuleNotFoundError: No module named 'sage'. SageMath and Docker are NOT available on this system. "
+                        "You MUST write standard Python 3 code using gmpy2, sympy, pycryptodome, or rsa_cryptanalysis without 'import sage'."
+                    )
+
                 return {
                     "stdout": res.stdout,
-                    "stderr": res.stderr,
+                    "stderr": stderr_out,
                     "exit_code": res.returncode,
                     "timed_out": False
                 }

@@ -1,5 +1,6 @@
 import os
 import re
+import shutil
 from typing import TypedDict, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
@@ -19,6 +20,9 @@ from llm_manager import fallback_llm
 
 sandbox = DockerCryptoSandbox(image="crypto-sandbox:latest", timeout=30)
 llm = fallback_llm
+
+# Detect if SageMath is available either via Docker or native sage binary
+SAGE_AVAILABLE = bool(sandbox.has_docker or shutil.which("sage"))
 
 # --- State Definition ---
 class CryptoAgentState(TypedDict):
@@ -215,6 +219,9 @@ def classify_and_plan(state: CryptoAgentState) -> dict:
                 f"  - Decrypted Preview: {dec_sample[:120]}"
             )
 
+    engine_option = '"python" or "sage"' if SAGE_AVAILABLE else '"python" (SageMath/Docker is NOT installed. You MUST select python)'
+    engine_format = '<python or sage>' if SAGE_AVAILABLE else 'python'
+
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are an expert cryptographic security auditor and CTF player.
 Analyze the given parameters and determine the vulnerability.
@@ -271,12 +278,12 @@ Challenge:
 Analyze:
 1. Category (RSA, Classical, AES, ECC, Lattice, PRNG, Hash, XOR, Binary, Encoding)
 2. Underlying Mathematical Flaw / Attack
-3. Engine: "python" or "sage"
+3. Engine: {engine_option}
 
 Format:
 CATEGORY: <category>
 ATTACK: <attack name>
-ENGINE: <python or sage>
+ENGINE: {engine_format}
 <|eot_id|><|start_header_id|>assistant<|end_header_id|>"""
 
     resp = llm.invoke([HumanMessage(content=prompt)]).content
@@ -285,7 +292,7 @@ ENGINE: <python or sage>
     att_match = re.search(r"ATTACK:\s*(.*)", resp, re.IGNORECASE)
     eng_match = re.search(r"ENGINE:\s*(.*)", resp, re.IGNORECASE)
 
-    is_sage = bool(eng_match and "sage" in eng_match.group(1).lower())
+    is_sage = bool(eng_match and "sage" in eng_match.group(1).lower()) if SAGE_AVAILABLE else False
     attack = att_match.group(1).strip() if att_match else "Direct Computation"
     cat = cat_match.group(1).strip() if cat_match else "Crypto"
 
@@ -317,7 +324,15 @@ def generate_solver(state: CryptoAgentState) -> dict:
     if state.get("execution_stderr"):
         feedback = f"\nPrevious attempt failed:\n[STDERR]: {state['execution_stderr']}\n[STDOUT]: {state.get('execution_stdout', '')}\nFix the logic or syntax error."
 
-    engine_name = "SageMath (.sage)" if state.get("is_sage") else "Python 3 (.py)"
+    use_sage = SAGE_AVAILABLE and state.get("is_sage", False)
+    engine_name = "SageMath (.sage)" if use_sage else "Python 3 (.py)"
+    sage_notice = ""
+    if not SAGE_AVAILABLE or not use_sage:
+        sage_notice = (
+            "\n[CRITICAL HOST REQUIREMENT]\n"
+            "SageMath is NOT installed on this machine. You MUST write standard Python 3 code using gmpy2, sympy, pycryptodome, or rsa_cryptanalysis.\n"
+            "DO NOT write 'import sage', 'from sage.all import *', or use Sage-specific types (e.g. PolynomialRing, Zmod). Use standard Python 3 syntax."
+        )
 
     # Inject hash analysis hints into the solver prompt
     hash_hint = ""
@@ -395,6 +410,7 @@ Attack Strategy: {state.get('attack_hypothesis')}
 {hash_hint}
 {rsa_hint}
 {classical_hint}
+{sage_notice}
 {feedback}
 
 Output the code block:
@@ -409,9 +425,11 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
     print("🚀 [Step 3] Executing solver in sandbox...")
     code = state["generated_code"]
     
-    # Only use sage if explicitly requested and has import sage or sage commands, not substring of 'message'
-    has_sage_keyword = bool(re.search(r"\b(import\s+sage|from\s+sage|IntegerRing|PolynomialRing|Zmod)\b", code))
-    is_sage = state.get("is_sage", False) and has_sage_keyword
+    if not SAGE_AVAILABLE:
+        is_sage = False
+    else:
+        has_sage_keyword = bool(re.search(r"\b(import\s+sage|from\s+sage|IntegerRing|PolynomialRing|Zmod)\b", code))
+        is_sage = state.get("is_sage", False) and has_sage_keyword
 
     res = sandbox.execute(code=code, is_sage=is_sage, allow_network=False)
     stdout = res["stdout"]
@@ -442,11 +460,16 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
     else:
         print("❌ No decoded result captured on this attempt.")
 
+    is_sage_state = state.get("is_sage", False)
+    if not SAGE_AVAILABLE or "sagemath" in stderr.lower() or "no module named 'sage'" in stderr.lower():
+        is_sage_state = False
+
     return {
         "execution_stdout": stdout,
         "execution_stderr": stderr if (res["exit_code"] != 0 or not decoded_res) else "",
         "captured_flag": decoded_res,
         "decoded_result": decoded_res,
+        "is_sage": is_sage_state,
         "iteration": state["iteration"] + 1
     }
 
