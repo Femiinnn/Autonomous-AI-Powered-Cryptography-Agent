@@ -149,6 +149,53 @@ The suite includes an independent, pure-Python and `gmpy2`-accelerated mathemati
 | **Boneh-Durfee Attack** | Small private exponent beyond Wiener bound ($d < N^{0.292}$) | Sub-lattice basis reduction using LLL |
 | **ROCA Detection & Factorization** | Vulnerable Infineon RSA firmware (CVE-2017-15361) | Fast residue subgroup fingerprinting & discrete log factorization |
 
+### 📐 Elliptic Curve Cryptography Suite (`ecc_cryptanalysis.py`)
+
+#### Essential ECC Mathematics
+The suite includes an independent, pure-Python and `gmpy2`-accelerated Weierstrass curve engine:
+- **Short Weierstrass Curve Arithmetic**: Supports curves of form $y^2 \equiv x^3 + a x + b \pmod p$ with discriminant $\Delta = -16(4a^3 + 27b^2) \not\equiv 0 \pmod p$
+- **ECPoint Group Operations**: Constant-time affine point addition $P + Q$, doubling $2P$, and point at infinity $\mathcal{O}$
+- **Fast Double-and-Add Scalar Multiplication**: Computes $k \cdot P$ in $O(\log k)$ group additions
+- **Modular Square Roots**: Tonelli-Shanks algorithm for point decompression $(x, y)$ from $x$ and sign bit
+- **Order Determination & Smooth Subgroups**: Order factoring and cofactor decomposition for subgroup validation
+
+#### Attack Matrix (10 Algorithms & Lattice HNP)
+| Method / Algorithm | Application & Vulnerability | Mathematical Technique & Complexity |
+|---|---|---|
+| **Elliptic Curve Discrete Logarithm Problem (ECDLP)** | Recover private scalar $d$ from $Q = d \cdot G$ | Multi-strategy auto-solver selecting BSGS, Pohlig-Hellman, or Pollard's Rho |
+| **Baby-Step Giant-Step (BSGS)** | Solve discrete logarithms for small/bounded scalars | Space-time tradeoff in $O(\sqrt{N})$ group steps using hash lookup table |
+| **Pollard's Rho for ECDLP** | Discrete logarithm attack | Low-memory Floyd's cycle-finding algorithm over pseudo-random point walks |
+| **Pohlig-Hellman Attack** | Weak subgroup order ($n = \#E(\mathbb{F}_p)$ is smooth) | Solves DLP in prime-power subgroups and recombines via Chinese Remainder Theorem (CRT) |
+| **Invalid Curve Attack** | Exploit missing curve point validation | Submits points on invalid curve $y^2 \equiv x^3 + ax + b' \pmod p$ with small order to recover $d \pmod{\text{ord}}$ |
+| **Small Subgroup Attack** | Weak subgroup parameters / non-prime order | Queries points in small cofactor subgroup $r \mid h$ to extract partial scalar bits $d \pmod r$ |
+| **Smart's Attack** | Anomalous elliptic curves ($\#E(\mathbb{F}_p) = p$) | Hensel lift of curve & points to $\mathbb{Z}/p^2\mathbb{Z}$ and $p$-adic formal group logarithm in $O(\log^3 p)$ |
+| **Nonce Reuse Attack** | Recover ECDSA private key from duplicate nonce $k$ | Algebraic recovery: $k = (z_1 - z_2)(s_1 - s_2)^{-1} \pmod n$, $d = (s_1 k - z_1)r^{-1} \pmod n$ |
+| **Biased Nonce Attack** | Lattice-based key recovery from partially biased nonces | Formulates Hidden Number Problem (HNP) and solves via Lenstra–Lenstra–Lovász (LLL) lattice reduction |
+| **LLL-based ECDSA Attack** | Recover private keys from partial nonce leakage | Multi-signature Kannan embedding matrix reduction with LLL to uncover secret scalar $d$ |
+
+### 🛡️ Symmetric Cryptography Suite (`symmetric_cryptanalysis.py`)
+
+#### Supported Ciphers & Modes
+The suite features a robust pure-Python & `pycryptodome` cryptographic engine:
+- **Block Ciphers**: AES-128, AES-192, AES-256, DES, 3DES (Triple DES), and Blowfish
+- **Stream Ciphers**: ChaCha20 and RC4 (ARC4)
+- **Operational Modes**: Electronic Codebook (ECB), Cipher Block Chaining (CBC), Cipher Feedback (CFB), Output Feedback (OFB), and Counter Mode (CTR)
+- **Authenticated Encryption**: Galois/Counter Mode (AES-GCM) with pure-Python GHASH polynomial arithmetic over $\text{GF}(2^{128})$ ($x^{128} + x^7 + x^2 + x + 1$)
+
+#### Attack Matrix (10 Core Cryptanalysis Methods)
+| Method / Algorithm | Application & Vulnerability | Cryptanalytic Technique & Complexity |
+|---|---|---|
+| **ECB Byte-at-a-Time Attack** | Adaptive chosen-prefix / secret suffix recovery | Discovers block size, validates ECB determinism, and brute-forces secret bytes one-by-one via dictionary block matching |
+| **CBC Bit-Flipping Attack** | Predictable block cipher malleability | Flips bit positions in ciphertext block $C_{i-1}$ or IV to precisely inject desired bytes into decrypted plaintext block $P_i$: $C_{i-1}'[k] = C_{i-1}[k] \oplus P_i[k] \oplus P_i'[k]$ |
+| **Padding Oracle Attack** | PKCS#7 error side-channel leakage | Full ciphertext decryption block-by-block, byte-by-byte via Vaudenay's oracle probe without requiring the encryption key |
+| **CTR Nonce Reuse Attack** | Two-time pad / stream cipher keystream reuse | Algebraic keystream cancellation $C_1 \oplus C_2 = P_1 \oplus P_2$; recovers keystream via known plaintext or statistical crib-dragging |
+| **GCM Nonce Reuse Attack** | Reused nonce in AES-GCM | Extracts plaintext keystream XOR and sets up tag difference polynomial $T_1 \oplus T_2 = \text{GHASH}_H(C_1) \oplus \text{GHASH}_H(C_2)$ to recover authentication subkey $H$ in $\text{GF}(2^{128})$ |
+| **Known-Plaintext Attack (KPA)** | Known $(P, C)$ pairs | Derives stream cipher keystream $KS = P \oplus C$, or brute-forces small key spaces matching $E_K(P) = C$ |
+| **Chosen-Plaintext Attack (CPA)** | Oracle capability / mode distinction | Submits repeated block probes to distinguish ECB vs CBC mode, detect fixed IVs, and extract secret prefix/suffix boundaries |
+| **Differential Cryptanalysis** | Non-uniform difference propagation | Computes Difference Distribution Table (DDT) of S-Boxes: $\text{DDT}[\Delta X][\Delta Y] = \#\{X : S(X) \oplus S(X \oplus \Delta X) = \Delta Y\}$, finding optimal high-probability differential characteristics |
+| **Linear Cryptanalysis** | Linear approximation of non-linear primitives | Computes Linear Approximation Table (LAT) and Matsui's Piling-Up Lemma to identify maximum correlation bias $\epsilon = |p - 1/2|$ and extract key bits |
+| **Meet-in-the-Middle Attack (MITM)** | Double encryption $C = E_{K_2}(E_{K_1}(P))$ (e.g. 2DES) | Precomputes forward table $\{E_{K_1}(P) : K_1\}$ in $O(2^k)$ and matches against decrypted intermediate states $D_{K_2}(C)$ |
+
 ### 🏛️ Classical Cryptanalysis Suite (`classical_crypto.py`)
 | Cipher / Method | Description | Algorithm & Technique |
 |---|---|---|
@@ -179,7 +226,7 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 
 - **12 Guided Category Selectors**: `Auto`, `RSA`, `Classical`, `XOR`, `AES`, `ECC`, `Lattice`, `PRNG`, `Hash`, `Encoding`, `Binary`, `Custom`
 - **Multi-File & Multi-Format Upload Section**: Drag-and-drop or select multiple files simultaneously across diverse formats (Python/Sage scripts, PEM/DER keys, encrypted binaries, images/stego, packet captures, structured data) with format badges and individual file removal
-- **30+ Interactive Attack Strategy Chips**: Guide the agent or test specific vulnerabilities directly
+- **53+ Interactive Attack Strategy Chips**: Guide the agent or test specific vulnerabilities directly across Symmetric, ECC, RSA, Classical, Block ciphers, and XOR
 - **Decoded Output Viewer**: Clean output panel with copy functionality for any plaintext, key, or flag format
 - **Candidate Permutations Panel**: Visualizes all classical cipher decryptions ranked by English quadgram scoring
 - **Multi-Layer Encoding & Hash Inspection Card**: Displays recursive peeling layers and hash identification candidates
@@ -188,8 +235,12 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 
 | Endpoint | Method | Payload / Parameters | Description |
 |---|---|---|---|
+| `/api/symmetric` | `POST` | `{"text": "cipher=... mode=... ct=..."}` | Direct instant parameter parsing & Symmetric attack execution (10 methods, 6 ciphers) |
+| `/api/ecc` | `POST` | `{"text": "p=... a=... b=..."}` | Direct instant parameter parsing & ECC attack execution (10 methods + LLL HNP) |
+| `/api/rsa` | `POST` | `{"text": "N=... e=... c=..."}` | Direct instant parameter parsing & RSA attack execution (15 methods + LLL) |
 | `/api/classical` | `POST` | `{"text": "..."}` | Direct instant analysis & decryption of classical ciphers (18 methods) |
-| `/api/rsa` | `POST` | `{"text": "N=... e=... c=..."}` | Direct instant parameter parsing & RSA attack execution |
+| `/api/models` | `GET` | — | Returns active model, fallback models chain, and key rotation status |
+| `/api/cleanup` | `POST` | — | Purges unwanted temporary files from `inputs/` and `outputs/` directories |
 | `/solve` | `POST` | `FormData(challenge, category, attack, challenge_files)` | Dispatches challenge & uploaded files to autonomous LangGraph agent |
 | `/stream/<job_id>` | `GET` | — | Server-Sent Events (SSE) live stream of logs and execution results |
 
@@ -242,6 +293,8 @@ crypto-ctf-agent/
 ├── agent.py              # LangGraph state machine — core reasoning loop
 ├── llm_manager.py        # Automated Model & API Key Fallback Engine
 ├── solve.py              # CLI entry point: reads inputs/, launches agent
+├── ecc_cryptanalysis.py  # ECC cryptanalysis suite (10 attacks & LLL HNP)
+├── symmetric_cryptanalysis.py # Symmetric cryptanalysis suite (10 attacks, 6 ciphers)
 ├── classical_crypto.py   # Classical cryptanalysis suite (18 methods & solvers)
 ├── rsa_cryptanalysis.py  # RSA cryptanalysis suite (15 attacks & LLL lattice)
 ├── hash_decoder.py       # Multi-layer hash & encoding auto-detector

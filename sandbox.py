@@ -25,6 +25,7 @@ class DockerCryptoSandbox:
             f.write(code)
             temp_path = f.name
         workdir = os.path.dirname(temp_path)
+        copied_files = []
 
         # Copy challenge files from inputs/ into workdir so exploit can access them by relative filename
         inputs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inputs")
@@ -35,6 +36,7 @@ class DockerCryptoSandbox:
                 if os.path.isfile(s) and not os.path.exists(d):
                     try:
                         shutil.copy2(s, d)
+                        copied_files.append(d)
                     except Exception:
                         pass
 
@@ -118,4 +120,13 @@ class DockerCryptoSandbox:
             }
         finally:
             if os.path.exists(temp_path):
-                os.remove(temp_path)
+                try:
+                    os.remove(temp_path)
+                except Exception:
+                    pass
+            for fpath in copied_files:
+                if os.path.exists(fpath):
+                    try:
+                        os.remove(fpath)
+                    except Exception:
+                        pass

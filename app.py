@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = Path(__file__).parent / 'inputs'
+app.config['OUTPUTS_FOLDER'] = Path(__file__).parent / 'outputs'
 app.config['MAX_CONTENT_LENGTH'] = 32 * 1024 * 1024  # 32 MB
 
 DISALLOWED_EXTENSIONS = {'exe', 'bat', 'cmd', 'vbs', 'msi', 'scr', 'com', 'ps1'}
@@ -50,6 +51,8 @@ def solve():
 
     file_info_blocks = []
     app.config['UPLOAD_FOLDER'].mkdir(exist_ok=True)
+    app.config['OUTPUTS_FOLDER'].mkdir(exist_ok=True)
+    uploaded_saved_paths = []
 
     for uploaded in files_list:
         if not uploaded or not uploaded.filename:
@@ -62,6 +65,7 @@ def solve():
 
         save_path = app.config['UPLOAD_FOLDER'] / fname
         uploaded.save(save_path)
+        uploaded_saved_paths.append(save_path)
 
         if is_image(fname):
             try:
@@ -212,6 +216,26 @@ def solve():
                 'flag': ra.get('flag', '')
             }
 
+            # ── ECC Analysis ─────────────────────────────────────────────────
+            ea = result.get('ecc_analysis') or {}
+            ecc_info = {
+                'status': ea.get('status', ''),
+                'attack': ea.get('attack', ''),
+                'flag': ea.get('flag', ''),
+                'explanation': ea.get('explanation', '')
+            }
+
+            # ── Symmetric Analysis ───────────────────────────────────────────
+            sa = result.get('symmetric_analysis') or {}
+            symmetric_info = {
+                'status': sa.get('status', ''),
+                'cipher': sa.get('cipher', ''),
+                'mode': sa.get('mode', ''),
+                'attack': sa.get('attack') or sa.get('method', ''),
+                'flag': sa.get('flag', ''),
+                'explanation': sa.get('explanation', '')
+            }
+
             q.put({
                 'type': 'result',
                 'decoded_result': decoded_result,
@@ -220,13 +244,34 @@ def solve():
                 'stdout': stdout_out,
                 'hash_info': hash_info,
                 'classical_info': classical_info,
-                'rsa_info': rsa_info
+                'rsa_info': rsa_info,
+                'ecc_info': ecc_info,
+                'symmetric_info': symmetric_info
             })
+
+            # Save clean final outputs to outputs/
+            try:
+                out_dir = app.config['OUTPUTS_FOLDER']
+                out_dir.mkdir(exist_ok=True)
+                if code:
+                    (out_dir / 'exploit.py').write_text(code, encoding='utf-8')
+                if decoded_result:
+                    (out_dir / 'result.txt').write_text(str(decoded_result), encoding='utf-8')
+                    (out_dir / 'flag.txt').write_text(str(decoded_result), encoding='utf-8')
+            except Exception:
+                pass
         except Exception as exc:
             q.put({'type': 'error', 'message': str(exc)})
         finally:
             sys.stdout = old_stdout
             q.put({'type': 'done'})
+            # ── Automatic cleanup: remove uploaded challenge files from inputs/ after execution
+            for p in uploaded_saved_paths:
+                try:
+                    if p.exists() and p.is_file():
+                        p.unlink()
+                except Exception:
+                    pass
 
     t = threading.Thread(target=run_agent, daemon=True)
     t.start()
@@ -289,12 +334,73 @@ def api_rsa():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/ecc', methods=['POST'])
+def api_ecc():
+    """Direct instant Elliptic Curve Cryptanalysis (ECC) API endpoint."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '') or request.form.get('text', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide ECC parameters (p, a, b, G, Q, or ECDSA signatures).'}), 400
+    try:
+        from ecc_cryptanalysis import analyze_and_solve_ecc
+        res = analyze_and_solve_ecc(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/symmetric', methods=['POST'])
+def api_symmetric():
+    """Direct instant Symmetric Cryptanalysis API endpoint."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '') or request.form.get('text', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide symmetric parameters (cipher, mode, key, iv, ciphertext, etc.).'}), 400
+    try:
+        from symmetric_cryptanalysis import analyze_and_solve_symmetric
+        res = analyze_and_solve_symmetric(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/models', methods=['GET'])
 def api_models():
     """Returns the currently active model and configured fallback chain."""
     try:
         from llm_manager import fallback_llm
         return jsonify(fallback_llm.get_status())
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/cleanup', methods=['POST'])
+def api_cleanup():
+    """
+    Cleans up unwanted temporary files from inputs/ and outputs/ directories.
+    Preserves default prompt.txt template if present.
+    """
+    cleaned = {'inputs': [], 'outputs': []}
+    try:
+        in_dir = app.config['UPLOAD_FOLDER']
+        if in_dir.exists():
+            for item in in_dir.iterdir():
+                if item.is_file() and item.name != 'prompt.txt':
+                    try:
+                        item.unlink()
+                        cleaned['inputs'].append(item.name)
+                    except Exception:
+                        pass
+        out_dir = app.config['OUTPUTS_FOLDER']
+        if out_dir.exists():
+            for item in out_dir.iterdir():
+                if item.is_file():
+                    try:
+                        item.unlink()
+                        cleaned['outputs'].append(item.name)
+                    except Exception:
+                        pass
+        return jsonify({'status': 'ok', 'message': 'Unwanted files cleaned up successfully.', 'cleaned': cleaned})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

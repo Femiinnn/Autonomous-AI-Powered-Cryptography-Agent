@@ -41,9 +41,11 @@ class CryptoAgentState(TypedDict):
     hash_analysis: Optional[dict]       # full report from hash_decoder
     classical_analysis: Optional[dict]  # full report from classical_crypto
     rsa_analysis: Optional[dict]        # full report from rsa_cryptanalysis
+    ecc_analysis: Optional[dict]        # full report from ecc_cryptanalysis
+    symmetric_analysis: Optional[dict]  # full report from symmetric_cryptanalysis
 
 
-# ── Hash, Encoding, Classical & RSA Detection Node ──────────────────────────
+# ── Hash, Encoding, Classical, RSA, ECC & Symmetric Detection Node ──────────
 def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
     """
     Pre-processing node:
@@ -51,9 +53,13 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
     2. Runs automated Classical Cryptanalysis ONLY on non-RSA / non-math ciphertexts.
     3. Runs automated RSA Cryptanalysis (Wiener, Fermat, Small e, Common Modulus, etc.)
        when mathematical RSA parameters (N, e, c) are detected.
+    4. Runs automated ECC Cryptanalysis (Nonce reuse, Smart's anomalous attack, BSGS)
+       when curve parameters or ECDSA signatures are detected.
+    5. Runs automated Symmetric Cryptanalysis (Padding Oracle, Bit Flip, Nonce Reuse, MITM, etc.)
+       when symmetric ciphers (AES, DES, 3DES, Blowfish, ChaCha20, RC4) are detected.
     Only short-circuits if a genuine verified flag is discovered.
     """
-    print("\n🔎 [Pre-Step] Scanning for Hash / Encoding / Classical / RSA patterns…")
+    print("\n🔎 [Pre-Step] Scanning for Hash / Encoding / Classical / RSA / ECC / Symmetric patterns…")
     challenge = state["challenge"]
     
     # Check if this is an asymmetric / mathematical RSA challenge
@@ -81,6 +87,8 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
     # 2. Classical Cryptanalysis Suite (skip on large-integer RSA/math challenges)
     classical_res = {}
     rsa_res = {}
+    ecc_res = {}
+    symmetric_res = {}
     verified_flag = None
     solved_category = "Classical Cryptography"
     solved_attack = "Direct Cryptanalysis"
@@ -127,10 +135,64 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
             print(f"  ⚠️ RSA cryptanalysis error: {e}")
             rsa_res = {"status": "error", "error": str(e)}
 
+    # 3. ECC Cryptanalysis Suite (when curve parameters, points, or ECDSA signatures are detected)
+    is_ecc = bool(
+        re.search(r'\b(curve|elliptic|secp256|p256|point|ecdlp|ecdsa|Gx|Gy|Qx|Qy|nonce\s*reuse)\b', challenge, re.IGNORECASE)
+        or (re.search(r'\bp\s*[:=]\s*\d+', challenge, re.IGNORECASE) and re.search(r'\b(a|b)\s*[:=]\s*\d+', challenge, re.IGNORECASE))
+        or (re.search(r'\b(r|s)\s*[:=]\s*\d+', challenge, re.IGNORECASE) and re.search(r'\b(z|hash)\s*[:=]\s*\d+', challenge, re.IGNORECASE))
+    )
+    if is_ecc and not verified_flag:
+        print("  📐 Elliptic Curve parameters detected — executing ECC Cryptanalysis Suite…")
+        try:
+            from ecc_cryptanalysis import analyze_and_solve_ecc
+            ecc_res = analyze_and_solve_ecc(challenge)
+            if ecc_res.get("status") == "solved" and (ecc_res.get("flag") or ecc_res.get("private_scalar")):
+                pt = ecc_res.get("flag") or str(ecc_res.get("private_scalar"))
+                atk = ecc_res.get("attack", "ECC Analysis")
+                verified_flag = pt
+                solved_category = "Elliptic Curve Cryptography (ECC)"
+                solved_attack = atk
+                solved_code = f"# Solved directly via ecc_cryptanalysis ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED ECC FLAG RECOVERED via {atk}: {pt}")
+            else:
+                atk_sugg = ecc_res.get("attack") or "ECDLP"
+                print(f"  ℹ️ ECC Analysis initialized. Target attack: {atk_sugg}")
+        except Exception as e:
+            print(f"  ⚠️ ECC cryptanalysis error: {e}")
+            ecc_res = {"status": "error", "error": str(e)}
+
+    # 4. Symmetric Cryptanalysis Suite (AES, DES, 3DES, Blowfish, ChaCha20, RC4, CBC, ECB, CTR, GCM)
+    is_sym = bool(
+        re.search(r'\b(aes|des|3des|des3|blowfish|chacha20|rc4|cbc|ecb|cfb|ofb|ctr|gcm|padding oracle|bit.?flip|nonce.?reuse|meet.?in.?the.?middle)\b', challenge, re.IGNORECASE)
+    )
+    if is_sym and not verified_flag:
+        print("  🛡️ Symmetric Cryptography parameters detected — executing Symmetric Cryptanalysis Suite…")
+        try:
+            from symmetric_cryptanalysis import analyze_and_solve_symmetric
+            symmetric_res = analyze_and_solve_symmetric(challenge)
+            if symmetric_res.get("flag") or symmetric_res.get("recovered_p2"):
+                pt = symmetric_res.get("flag") or symmetric_res.get("recovered_p2")
+                if isinstance(pt, bytes):
+                    pt = pt.decode('latin1', errors='replace')
+                atk = symmetric_res.get("attack", symmetric_res.get("method", "Symmetric Cryptanalysis"))
+                verified_flag = pt
+                solved_category = "Symmetric Cryptography"
+                solved_attack = atk
+                solved_code = f"# Solved directly via symmetric_cryptanalysis ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED SYMMETRIC FLAG RECOVERED via {atk}: {pt}")
+            else:
+                atk_sugg = symmetric_res.get("attack") or symmetric_res.get("method") or "Symmetric Analysis"
+                print(f"  ℹ️ Symmetric Analysis initialized. Target attack: {atk_sugg}")
+        except Exception as e:
+            print(f"  ⚠️ Symmetric cryptanalysis error: {e}")
+            symmetric_res = {"status": "error", "error": str(e)}
+
     result_dict = {
         "hash_analysis": hash_analysis,
         "classical_analysis": classical_res,
-        "rsa_analysis": rsa_res
+        "rsa_analysis": rsa_res,
+        "ecc_analysis": ecc_res,
+        "symmetric_analysis": symmetric_res
     }
     # Only short-circuit if a genuine verified flag was recovered
     if verified_flag:
@@ -219,6 +281,28 @@ def classify_and_plan(state: CryptoAgentState) -> dict:
                 f"  - Decrypted Preview: {dec_sample[:120]}"
             )
 
+    # Inject ECC cryptanalysis pre-analysis
+    ecc_ctx = ""
+    ea = state.get("ecc_analysis") or {}
+    if ea and ea.get("parameters"):
+        ecc_ctx = f"\n[ECC Parameters Detected]\n"
+        if ea.get("attack"):
+            ecc_ctx += f"  - Suggested ECC Attack: {ea['attack']}\n"
+        if ea.get("explanation"):
+            ecc_ctx += f"  - Note: {ea['explanation']}\n"
+
+    # Inject Symmetric cryptanalysis pre-analysis
+    symmetric_ctx = ""
+    sa = state.get("symmetric_analysis") or {}
+    if sa and (sa.get("cipher") or sa.get("attack") or sa.get("method")):
+        symmetric_ctx = f"\n[Symmetric Cryptography Detected]\n"
+        if sa.get("cipher"):
+            symmetric_ctx += f"  - Cipher: {sa['cipher']} (Mode: {sa.get('mode', 'Unknown')})\n"
+        if sa.get("attack") or sa.get("method"):
+            symmetric_ctx += f"  - Target Attack: {sa.get('attack') or sa.get('method')}\n"
+        if sa.get("explanation"):
+            symmetric_ctx += f"  - Note: {sa['explanation']}\n"
+
     engine_option = '"python" or "sage"' if SAGE_AVAILABLE else '"python" (SageMath/Docker is NOT installed. You MUST select python)'
     engine_format = '<python or sage>' if SAGE_AVAILABLE else 'python'
 
@@ -227,6 +311,30 @@ You are an expert cryptographic security auditor and CTF player.
 Analyze the given parameters and determine the vulnerability.
 
 Key CTF Rules of Thumb:
+Symmetric Cryptography (AES, DES, 3DES, Blowfish, ChaCha20, RC4) Attacks:
+- ECB Byte-at-a-Time Attack: oracle encrypts prefix || secret || pad in ECB mode. Recover unknown secret suffix byte-by-byte via dictionary block matching.
+- CBC Bit-Flipping Attack: flip bit positions in ciphertext block C_{{i-1}} to precisely alter decrypted plaintext block P_i: C_{{i-1}}'[k] = C_{{i-1}}[k] ^ P_i[k] ^ Target_i[k].
+- Padding Oracle Attack: server returns padding validity. Decrypt full ciphertext block-by-block, byte-by-byte using Vaudenay's technique without knowing the key.
+- CTR Nonce Reuse Attack: same nonce/IV reused across multiple messages. C1 ^ C2 = P1 ^ P2; recover keystream and decrypt all plaintexts.
+- GCM Nonce Reuse Attack: reused nonce in AES-GCM leaks keystream and enables GHASH subkey H recovery over GF(2^128) via polynomial root finding for authentication forgery.
+- Known-Plaintext Attack (KPA): derive keystream KS = P ^ C for stream ciphers, or brute-force weak/short keys matching E_K(P) = C.
+- Chosen-Plaintext Attack (CPA): distinguish ECB vs CBC mode with 2x block repeated inputs, determine IV randomization and block boundaries.
+- Differential Cryptanalysis: difference distribution table (DDT) tracks Delta_P -> Delta_C through S-Boxes to filter candidate subkeys.
+- Linear Cryptanalysis: linear approximation table (LAT) and Matsui's Piling-up Lemma determine optimal parity masks and recover key bits with maximum bias.
+- Meet-in-the-Middle Attack (MITM): crack double encryption C = E_K2(E_K1(P)) in O(2^k) time and space by computing forward table {{E_K1(P): K1}} and matching D_K2(C).
+
+Elliptic Curve Cryptography (ECC) Attacks:
+- Baby-Step Giant-Step (BSGS): solve discrete log Q = d*P in O(sqrt(N)) when scalar d <= 10^7 or small subgroup order.
+- Pollard's Rho for ECDLP: general low-memory cycle detection discrete logarithm attack.
+- Pohlig-Hellman: curve order n = #E(F_p) factors into small prime factors (smooth order); solve subgroups and recombine via CRT.
+- Smart's Attack (Anomalous Curves): curve order #E(F_p) == p (trace of Frobenius t = 1); solve ECDLP in O(log^3 p) via p-adic formal group log.
+- Invalid Curve Attack: server fails to validate if P is on curve y^2 = x^3 + a*x + b; send point on invalid curve with small order to recover d mod order.
+- Small Subgroup / Twist Attack: cofactor h = #E / r > 1; small subgroup point leaks d mod small factors.
+- ECDSA Nonce Reuse: same nonce k reused across two signatures (r, s1) and (r, s2) with hashes z1, z2; recover k = (z1 - z2)/(s1 - s2) mod n, d = (s1*k - z1)/r mod n.
+- Biased Nonce Attack (HNP): partial nonce bits leaked or biased; form Hidden Number Problem matrix and recover private key d via LLL lattice reduction.
+- LLL-based ECDSA Attack: partial nonce MSB/LSB leakages across multiple signatures recovered via Kannan's embedding and LLL.
+- ECDLP Scalar Recovery: recover private scalar d such that Q = d*P.
+
 RSA & Asymmetric Attacks:
 - Wiener Attack: large e comparable to N (e > N^0.5, small private d < (1/3)*N^0.25).
 - Boneh-Durfee Attack: small private exponent d < N^0.292 beyond Wiener bound via LLL lattice.
@@ -272,11 +380,13 @@ Challenge:
 {state['challenge']}
 {hash_ctx}
 {rsa_ctx}
+{ecc_ctx}
+{symmetric_ctx}
 {classical_ctx}
 {previous_failure}
 
 Analyze:
-1. Category (RSA, Classical, AES, ECC, Lattice, PRNG, Hash, XOR, Binary, Encoding)
+1. Category (RSA, ECC, Symmetric, Classical, AES, Lattice, PRNG, Hash, XOR, Binary, Encoding)
 2. Underlying Mathematical Flaw / Attack
 3. Engine: {engine_option}
 
@@ -398,6 +508,30 @@ def generate_solver(state: CryptoAgentState) -> dict:
             f"  - LatticeLLL: reduce(basis, delta=0.75)"
         )
 
+    # Inject ECC hints into the solver prompt
+    ecc_hint = ""
+    ea = state.get("ecc_analysis") or {}
+    if ea and ea.get("parameters"):
+        ecc_hint = (
+            f"\n[ECC Mathematics & Cryptanalysis Helpers Available in ecc_cryptanalysis]\n"
+            f"You can import and use:\n"
+            f"  from ecc_cryptanalysis import EllipticCurve, ECPoint, ECCAttacks, analyze_and_solve_ecc\n"
+            f"  - EllipticCurve: add(P, Q), multiply(P, k), is_on_curve(P), decompress_point(x, y_parity)\n"
+            f"  - ECCAttacks: attack_ecdlp_bsgs, attack_ecdlp_pollard_rho, attack_pohlig_hellman, attack_smart_anomalous, attack_invalid_curve, attack_small_subgroup, attack_ecdsa_nonce_reuse, attack_ecdsa_biased_nonce_lll, attack_ecdsa_partial_nonce_leak\n"
+        )
+
+    # Inject Symmetric hints into the solver prompt
+    symmetric_hint = ""
+    sa = state.get("symmetric_analysis") or {}
+    if sa and (sa.get("cipher") or sa.get("attack") or sa.get("method")):
+        symmetric_hint = (
+            f"\n[Symmetric Cryptanalysis Helpers Available in symmetric_cryptanalysis]\n"
+            f"You can import and use:\n"
+            f"  from symmetric_cryptanalysis import SymmetricCipher, SymmetricAttacks, GCMUtils, pkcs7_pad, pkcs7_unpad, xor_bytes, analyze_and_solve_symmetric\n"
+            f"  - SymmetricCipher: encrypt(cipher_name, key, data, mode, iv, nonce, aad), decrypt(cipher_name, key, ct, mode, iv, nonce, tag, aad, raw)\n"
+            f"  - SymmetricAttacks: attack_ecb_byte_at_a_time, attack_cbc_bit_flip, attack_padding_oracle, attack_ctr_nonce_reuse, attack_gcm_nonce_reuse, attack_known_plaintext, attack_chosen_plaintext, attack_differential_cryptanalysis, attack_linear_cryptanalysis, attack_meet_in_the_middle\n"
+        )
+
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a solver generator for cryptographic CTFs.
 Write a standalone, self-contained {engine_name} script that executes the exploit and prints the flag.
@@ -409,6 +543,8 @@ Challenge:
 Attack Strategy: {state.get('attack_hypothesis')}
 {hash_hint}
 {rsa_hint}
+{ecc_hint}
+{symmetric_hint}
 {classical_hint}
 {sage_notice}
 {feedback}

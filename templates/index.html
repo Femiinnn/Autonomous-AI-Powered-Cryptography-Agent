@@ -311,6 +311,15 @@ textarea:focus{
   transition:all var(--transition);font-family:'Inter',sans-serif;
 }
 .file-clear-all:hover{background:rgba(244,63,94,.12);}
+.btn-clear-ghost{
+  background:rgba(255,255,255,.03);border:1px solid rgba(148,163,184,.14);
+  color:var(--text-3);font-size:11px;font-weight:600;cursor:pointer;
+  padding:3px 9px;border-radius:6px;transition:all var(--transition);
+  display:inline-flex;align-items:center;gap:5px;font-family:'Inter',sans-serif;
+}
+.btn-clear-ghost:hover{
+  background:rgba(244,63,94,.1);border-color:rgba(244,63,94,.3);color:var(--rose);
+}
 
 .file-items-container{
   display:flex;flex-direction:column;gap:6px;
@@ -825,6 +834,8 @@ textarea:focus{
 .badge-classical{background:rgba(16,185,129,.12);color:var(--emerald-l);border:1px solid rgba(16,185,129,.25);}
 .badge-block{background:rgba(6,182,212,.12);color:var(--cyan-l);border:1px solid rgba(6,182,212,.25);}
 .badge-hash{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25);}
+.badge-ecc{background:rgba(236,72,153,.12);color:#f472b6;border:1px solid rgba(236,72,153,.25);}
+.badge-sym{background:rgba(14,165,233,.12);color:#38bdf8;border:1px solid rgba(14,165,233,.25);}
 .catalog-desc{font-size:12.5px;color:var(--text-2);line-height:1.6;margin-bottom:14px;}
 .catalog-tags{display:flex;flex-wrap:wrap;gap:6px;}
 .catalog-tag{
@@ -899,11 +910,11 @@ textarea:focus{
 
 <!-- ── Stats Strip ────────────────────────────────────────────────────────── -->
 <div class="stats-strip">
-  <div class="stat"><div class="stat-num">33+</div><div class="stat-label">Attack Types</div></div>
+  <div class="stat"><div class="stat-num">53+</div><div class="stat-label">Attack Types</div></div>
+  <div class="stat"><div class="stat-num">10</div><div class="stat-label">Symmetric Attacks</div></div>
+  <div class="stat"><div class="stat-num">10</div><div class="stat-label">ECC Attacks</div></div>
   <div class="stat"><div class="stat-num">15</div><div class="stat-label">RSA Attacks</div></div>
   <div class="stat"><div class="stat-num">18</div><div class="stat-label">Classical Methods</div></div>
-  <div class="stat"><div class="stat-num">12+</div><div class="stat-label">Encoding Layers</div></div>
-  <div class="stat"><div class="stat-num">4</div><div class="stat-label">Retry Loops</div></div>
 </div>
 
 <!-- ── Main Grid ──────────────────────────────────────────────────────────── -->
@@ -922,6 +933,7 @@ textarea:focus{
             <div class="card-sub">Paste ciphertext, parameters, or attach a file</div>
           </div>
         </div>
+        <button type="button" class="btn-clear-ghost" id="btn-clear-input" title="Clear input text and remove attached files">🗑️ Clear Input</button>
       </div>
       <div class="card-body">
         <label class="field-label">Challenge Description</label>
@@ -1029,11 +1041,29 @@ textarea:focus{
           <div class="att-chip" data-val="Known-Plaintext XOR Key Recovery">🔓 Known-PT XOR</div>
           <div class="att-chip" data-val="Many-Time Pad XOR">📑 Many-Time Pad</div>
 
-          <div class="att-section-label">Block Ciphers &amp; Curves</div>
-          <div class="att-chip" data-val="Padding Oracle">💊 Padding Oracle (AES-CBC)</div>
-          <div class="att-chip" data-val="ECB Byte-at-a-Time">🧱 ECB Byte-at-a-Time</div>
-          <div class="att-chip" data-val="Pohlig-Hellman">📈 Pohlig-Hellman ECC/DLP</div>
-          <div class="att-chip" data-val="LSB Oracle Bit Reconstruction">🔮 LSB Oracle</div>
+          <div class="att-section-label">Elliptic Curve Cryptography (10 Attacks &amp; Lattice HNP)</div>
+          <div class="att-chip" data-val="Elliptic Curve Discrete Logarithm Problem">📐 ECDLP Scalar Recovery</div>
+          <div class="att-chip" data-val="Baby-Step Giant-Step">🐾 Baby-Step Giant-Step (BSGS)</div>
+          <div class="att-chip" data-val="Pollard's Rho for ECDLP">🌀 Pollard's Rho ECDLP</div>
+          <div class="att-chip" data-val="Pohlig-Hellman">📈 Pohlig-Hellman Weak Subgroup</div>
+          <div class="att-chip" data-val="Invalid Curve Attack">⚡ Invalid Curve Attack</div>
+          <div class="att-chip" data-val="Small Subgroup Attack">🔬 Small Subgroup Attack</div>
+          <div class="att-chip" data-val="Smart's Attack">🧠 Smart's Attack (Anomalous)</div>
+          <div class="att-chip" data-val="Nonce Reuse Attack">🔁 Nonce Reuse (ECDSA)</div>
+          <div class="att-chip" data-val="Biased Nonce Attack">⚖️ Biased Nonce (HNP via LLL)</div>
+          <div class="att-chip" data-val="LLL-based ECDSA Attack">🕸️ LLL-based ECDSA Attack</div>
+
+          <div class="att-section-label">Symmetric Cryptography (10 Attacks &amp; Block/Stream)</div>
+          <div class="att-chip" data-val="ECB Byte-at-a-Time Attack">🧱 ECB Byte-at-a-Time</div>
+          <div class="att-chip" data-val="CBC Bit-Flipping Attack">🔀 CBC Bit-Flipping</div>
+          <div class="att-chip" data-val="Padding Oracle Attack">💊 Padding Oracle (CBC)</div>
+          <div class="att-chip" data-val="CTR Nonce Reuse Attack">🔁 CTR Nonce Reuse</div>
+          <div class="att-chip" data-val="GCM Nonce Reuse Attack">⚡ GCM Nonce Reuse (GHASH)</div>
+          <div class="att-chip" data-val="Known-Plaintext Attack">🔓 Known-Plaintext Attack</div>
+          <div class="att-chip" data-val="Chosen-Plaintext Attack">🎯 Chosen-Plaintext Attack</div>
+          <div class="att-chip" data-val="Differential Cryptanalysis">📊 Differential Cryptanalysis</div>
+          <div class="att-chip" data-val="Linear Cryptanalysis">📈 Linear Cryptanalysis</div>
+          <div class="att-chip" data-val="Meet-in-the-Middle Attack">🤝 Meet-in-the-Middle (2DES/MITM)</div>
 
           <div class="att-section-label">Encodings &amp; Hashes</div>
           <div class="att-chip" data-val="Double Encoding Peel">🧅 Multi-Layer Peel</div>
@@ -1071,6 +1101,7 @@ textarea:focus{
             <div class="card-sub" id="pipeline-sub">Waiting for challenge…</div>
           </div>
         </div>
+        <button type="button" class="btn-clear-ghost" id="btn-clear-output" title="Clear terminal logs and output results">🗑️ Clear Output</button>
       </div>
 
       <!-- Steps -->
@@ -1183,6 +1214,52 @@ textarea:focus{
         <span class="catalog-tag">Partial Key Exposure</span>
         <span class="catalog-tag">Bellcore CRT Fault</span>
         <span class="catalog-tag">Continued Fractions</span>
+      </div>
+    </div>
+
+    <!-- Elliptic Curve Cryptography (ECC) -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>📐</span> ECC Cryptanalysis</div>
+        <span class="catalog-badge badge-ecc">10 Attacks + LLL</span>
+      </div>
+      <div class="catalog-desc">
+        Pure Python Weierstrass curve arithmetic, discrete logarithm attacks (BSGS, Pollard's Rho, Pohlig-Hellman, Smart's anomalous lift), invalid/small subgroup recovery, and lattice-based ECDSA nonce attacks (reused, biased, partial leakage).
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Baby-Step Giant-Step</span>
+        <span class="catalog-tag">Pollard's Rho ECDLP</span>
+        <span class="catalog-tag">Pohlig-Hellman Subgroup</span>
+        <span class="catalog-tag">Smart's Anomalous Attack</span>
+        <span class="catalog-tag">Invalid Curve Validation</span>
+        <span class="catalog-tag">Small Subgroup Leakage</span>
+        <span class="catalog-tag">ECDSA Nonce Reuse</span>
+        <span class="catalog-tag">Biased Nonce HNP (LLL)</span>
+        <span class="catalog-tag">Partial Nonce Leakage</span>
+        <span class="catalog-tag">ECDLP Scalar Recovery</span>
+      </div>
+    </div>
+
+    <!-- Symmetric Cryptography -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🛡️</span> Symmetric Cryptography</div>
+        <span class="catalog-badge badge-sym">10 Attacks &amp; 6 Ciphers</span>
+      </div>
+      <div class="catalog-desc">
+        Complete cryptanalysis suite for AES (128/192/256), DES, 3DES, Blowfish, ChaCha20, and RC4 across ECB, CBC, CFB, OFB, CTR, and authenticated GCM modes with GF(2^128) GHASH operations.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">ECB Byte-at-a-Time</span>
+        <span class="catalog-tag">CBC Bit-Flipping</span>
+        <span class="catalog-tag">Padding Oracle (Vaudenay)</span>
+        <span class="catalog-tag">CTR Nonce Reuse</span>
+        <span class="catalog-tag">GCM GHASH Forgery</span>
+        <span class="catalog-tag">Known-Plaintext (KPA)</span>
+        <span class="catalog-tag">Chosen-Plaintext (CPA)</span>
+        <span class="catalog-tag">Differential (DDT)</span>
+        <span class="catalog-tag">Linear (LAT)</span>
+        <span class="catalog-tag">Meet-in-the-Middle</span>
       </div>
     </div>
 
@@ -1605,16 +1682,78 @@ btnSubmit.addEventListener('click', async () => {
       pipelineSub.textContent = hasDecoded ? '✅ Decoded successfully!' : '⚠️ Solve failed';
       showResult(msg);
       setBusy(false);
+      // Remove unwanted/processed files from input column after execution
+      uploadedFiles = [];
+      renderFileList();
+      if (fileInput) fileInput.value = '';
     }
     if (msg.type === 'error') {
       sse.close();
       appendLog('Agent error: ' + msg.message, 't-err');
       showFailed('Agent error: ' + msg.message);
       setBusy(false);
+      // Remove unwanted/processed files from input column after execution
+      uploadedFiles = [];
+      renderFileList();
+      if (fileInput) fileInput.value = '';
     }
-    if (msg.type === 'done') { sse.close(); setBusy(false); }
+    if (msg.type === 'done') {
+      sse.close();
+      setBusy(false);
+      // Remove unwanted/processed files from input column after execution
+      uploadedFiles = [];
+      renderFileList();
+      if (fileInput) fileInput.value = '';
+    }
   };
-  sse.onerror = () => { sse.close(); appendLog('Stream disconnected.','t-err'); setBusy(false); };
+  sse.onerror = () => {
+    sse.close();
+    appendLog('Stream disconnected.','t-err');
+    setBusy(false);
+    uploadedFiles = [];
+    renderFileList();
+    if (fileInput) fileInput.value = '';
+  };
+});
+
+/* ── Clear Input Column ───────────────────────────────────────────────────── */
+document.getElementById('btn-clear-input')?.addEventListener('click', () => {
+  ta.value = '';
+  cc.textContent = '0 chars';
+  uploadedFiles = [];
+  renderFileList();
+  if (fileInput) fileInput.value = '';
+  fetch('/api/cleanup', {method: 'POST'}).catch(()=>{});
+});
+
+/* ── Clear Output Column ──────────────────────────────────────────────────── */
+document.getElementById('btn-clear-output')?.addEventListener('click', () => {
+  terminal.innerHTML = `
+    <div class="idle-placeholder" id="idle-ph">
+      <div class="idle-icon">🧠</div>
+      <div class="idle-title">Agent Standby</div>
+      <div class="idle-sub">Logs and outputs cleared. Configure your challenge and hit Launch Agent to begin.</div>
+    </div>
+  `;
+  termStarted = false;
+  resultCard.style.display = 'none';
+  const allResultsWrap = document.getElementById('all-results-wrap');
+  if (allResultsWrap) {
+    allResultsWrap.style.display = 'none';
+    allResultsWrap.innerHTML = '';
+  }
+  const hashCard = document.getElementById('hash-card');
+  if (hashCard) hashCard.style.display = 'none';
+  ['s-classify','s-generate','s-execute','s-result'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active','done');
+  });
+  const n1 = document.getElementById('s-classify')?.querySelector('.step-node'); if (n1) n1.textContent = '1';
+  const n2 = document.getElementById('s-generate')?.querySelector('.step-node'); if (n2) n2.textContent = '2';
+  const n3 = document.getElementById('s-execute')?.querySelector('.step-node'); if (n3) n3.textContent = '3';
+  const n4 = document.getElementById('s-result')?.querySelector('.step-node'); if (n4) n4.textContent = '4';
+  pipelineSub.textContent = 'Waiting for challenge…';
+  fetch('/api/cleanup', {method: 'POST'}).catch(()=>{});
 });
 
 /* ── Show result ──────────────────────────────────────────────────────────── */
@@ -1660,6 +1799,8 @@ function showResult(msg) {
     if (selectedCategory() !== 'auto') sumRow.innerHTML += `<span class="sum-pill cat">🏷 ${selectedCategory()}</span>`;
     if (selectedAttack()   !== 'auto') sumRow.innerHTML += `<span class="sum-pill atk">⚔️ ${selectedAttack()}</span>`;
     if (msg.rsa_info && msg.rsa_info.attack) sumRow.innerHTML += `<span class="sum-pill atk" style="background:rgba(99,102,241,.15);color:var(--violet-ll)">🔑 ${esc(msg.rsa_info.attack)}</span>`;
+    if (msg.ecc_info && msg.ecc_info.attack) sumRow.innerHTML += `<span class="sum-pill atk" style="background:rgba(236,72,153,.15);color:#f472b6">📐 ${esc(msg.ecc_info.attack)}</span>`;
+    if (msg.symmetric_info && msg.symmetric_info.attack) sumRow.innerHTML += `<span class="sum-pill atk" style="background:rgba(14,165,233,.15);color:#38bdf8">🛡️ ${esc(msg.symmetric_info.attack)}</span>`;
     if (msg.classical_info && msg.classical_info.best_cipher) sumRow.innerHTML += `<span class="sum-pill atk" style="background:rgba(16,185,129,.15);color:var(--emerald-l)">📜 ${esc(msg.classical_info.best_cipher)}</span>`;
     sumRow.innerHTML += `<span class="sum-pill eng">🐍 Python</span>`;
   } else {
@@ -1700,6 +1841,7 @@ function showResult(msg) {
     allResultsWrap.innerHTML = html;
   } else {
     allResultsWrap.style.display = 'none';
+    allResultsWrap.innerHTML = '';
   }
 
   if (msg.code && msg.code.trim()) {
@@ -1711,6 +1853,8 @@ function showResult(msg) {
       document.getElementById('code-copy').textContent = 'Copied!';
       setTimeout(() => document.getElementById('code-copy').textContent = 'Copy code', 1800);
     };
+  } else {
+    codeViewer.style.display = 'none';
   }
 
   // ── Hash / Encoding Analysis Card ───────────────────────────────────────
@@ -1729,7 +1873,9 @@ function showFailed(msg) {
   document.getElementById('copy-row').style.display = 'none';
   document.getElementById('summary-row').style.display = 'none';
   const allResultsWrap = document.getElementById('all-results-wrap');
-  if (allResultsWrap) allResultsWrap.style.display = 'none';
+  if (allResultsWrap) { allResultsWrap.style.display = 'none'; allResultsWrap.innerHTML = ''; }
+  const codeViewer = document.getElementById('code-viewer');
+  if (codeViewer) codeViewer.style.display = 'none';
 }
 
 /* ── Hash / Encoding Analysis Card renderer ───────────────────────────────── */
