@@ -33,12 +33,41 @@ import math
 import itertools
 from typing import List, Dict, Tuple, Optional, Any, Callable
 
-# PyCryptodome imports with resilient fallback
+# PyCryptodome imports with resilient fallback for environments where native .pyd may be blocked
 try:
-    from Crypto.Cipher import AES, DES, DES3, Blowfish, ChaCha20, ARC4
+    from Crypto.Cipher import AES
+except (ImportError, OSError):
+    AES = None
+
+try:
+    from Crypto.Cipher import DES
+except (ImportError, OSError):
+    DES = None
+
+try:
+    from Crypto.Cipher import DES3
+except (ImportError, OSError):
+    DES3 = None
+
+try:
+    from Crypto.Cipher import ChaCha20
+except (ImportError, OSError):
+    ChaCha20 = None
+
+try:
+    from Crypto.Cipher import ARC4
+except (ImportError, OSError):
+    ARC4 = None
+
+try:
+    from Crypto.Cipher import Blowfish
+except (ImportError, OSError):
+    Blowfish = None
+
+try:
     from Crypto.Util.Padding import pad as crypto_pad, unpad as crypto_unpad
-except ImportError:
-    AES = DES = DES3 = Blowfish = ChaCha20 = ARC4 = None
+except (ImportError, OSError):
+    crypto_pad = crypto_unpad = None
 
 # Check native ECB availability once at load time to avoid repetitive Windows AppControl blocks
 _HAS_NATIVE_ECB = False

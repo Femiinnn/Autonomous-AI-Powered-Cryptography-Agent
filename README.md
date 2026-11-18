@@ -117,7 +117,7 @@ The agent is a **LangGraph state machine** combining deterministic mathematical 
 
 ## 🔓 Supported Cryptographic Attacks
 
-### 🛡️ RSA Cryptanalysis Suite (`rsa_cryptanalysis.py`)
+### A. RSA Cryptanalysis Suite (`rsa_cryptanalysis.py`)
 
 #### Essential RSA Mathematics
 The suite includes an independent, pure-Python and `gmpy2`-accelerated mathematical foundation:
@@ -149,7 +149,7 @@ The suite includes an independent, pure-Python and `gmpy2`-accelerated mathemati
 | **Boneh-Durfee Attack** | Small private exponent beyond Wiener bound ($d < N^{0.292}$) | Sub-lattice basis reduction using LLL |
 | **ROCA Detection & Factorization** | Vulnerable Infineon RSA firmware (CVE-2017-15361) | Fast residue subgroup fingerprinting & discrete log factorization |
 
-### 📐 Elliptic Curve Cryptography Suite (`ecc_cryptanalysis.py`)
+### B. Elliptic Curve Cryptography (ECC) Suite (`ecc_cryptanalysis.py`)
 
 #### Essential ECC Mathematics
 The suite includes an independent, pure-Python and `gmpy2`-accelerated Weierstrass curve engine:
@@ -173,7 +173,29 @@ The suite includes an independent, pure-Python and `gmpy2`-accelerated Weierstra
 | **Biased Nonce Attack** | Lattice-based key recovery from partially biased nonces | Formulates Hidden Number Problem (HNP) and solves via Lenstra–Lenstra–Lovász (LLL) lattice reduction |
 | **LLL-based ECDSA Attack** | Recover private keys from partial nonce leakage | Multi-signature Kannan embedding matrix reduction with LLL to uncover secret scalar $d$ |
 
-### 🛡️ Symmetric Cryptography Suite (`symmetric_cryptanalysis.py`)
+### C. Classical Cryptanalysis Suite (`classical_crypto.py`)
+| Cipher / Method | Description | Algorithm & Technique |
+|---|---|---|
+| **Caesar Cipher** | Brute force all 25 shifts | Ranked by quadgram & Chi-squared English scoring |
+| **Affine Cipher** | $C = (a \cdot P + b) \pmod{26}$ | 312 key brute-force & known-plaintext modular inverse solver |
+| **Vigenère Cipher** | Polyalphabetic substitution | Automated Kasiski factor analysis, IoC, & per-column frequency solver |
+| **Atbash Cipher** | Reciprocal alphabet inversion ($A \leftrightarrow Z$) | Instant symmetric decode |
+| **ROT13 & ROT47** | Rotation substitution | ROT13 (letters) & ROT47 (printable ASCII 33–126) |
+| **Monoalphabetic Substitution** | Arbitrary 26-letter substitution | Hill climbing / simulated annealing with quadgram language model |
+| **Playfair Cipher** | $5 \times 5$ digraph matrix cipher | Matrix generator, digraph decryption, and shape analyzer |
+| **Hill Cipher** | Modular linear algebra over $\mathbb{Z}_{26}$ | $2 \times 2$ & $3 \times 3$ matrix inverse, known-plaintext, & brute-force |
+| **Rail Fence Cipher** | Zig-zag transposition cipher | Variable rail fence solver ($2 \le k \le 30$) with n-gram scoring |
+| **Columnar Transposition** | Row-write, column-read transposition | Permutation brute-force for key sizes $2 \le k \le 8$ |
+| **Single-Byte XOR** | 256-key XOR brute force | Byte frequency scoring & automatic `flag{...}` regex matching |
+| **Repeating-Key XOR** | Multi-byte keystream XOR | Normalized Hamming distance keysize detection & transposed block solver |
+| **Known-Plaintext XOR** | Key recovery from known prefix | Recovers key slice from known plaintexts (`flag{`, headers) & repeats |
+| **Frequency Analysis** | Monogram counts & percentages | Chi-squared ($\chi^2$) distance metric against standard English corpus |
+| **Kasiski Examination** | Polyalphabetic key length deduction | Repeated n-gram distance analysis & factor frequency ranking |
+| **Index of Coincidence (IoC)** | Text statistical randomness test | Calculates $\text{IC} = \frac{\sum f_i(f_i-1)}{N(N-1)}$ (English $\approx 0.067$) |
+| **N-gram Scoring** | Fluent language evaluation | Quadgram, trigram, and bigram log-probability language models |
+| **Crib Dragging** | Two-time pad / key reuse attack | Slides known crib across $C_1 \oplus C_2 = P_1 \oplus P_2$ to reveal plaintext |
+
+### D. Symmetric Cryptography Suite (`symmetric_cryptanalysis.py`)
 
 #### Supported Ciphers & Modes
 The suite features a robust pure-Python & `pycryptodome` cryptographic engine:
@@ -195,8 +217,6 @@ The suite features a robust pure-Python & `pycryptodome` cryptographic engine:
 | **Differential Cryptanalysis** | Non-uniform difference propagation | Computes Difference Distribution Table (DDT) of S-Boxes: $\text{DDT}[\Delta X][\Delta Y] = \#\{X : S(X) \oplus S(X \oplus \Delta X) = \Delta Y\}$, finding optimal high-probability differential characteristics |
 | **Linear Cryptanalysis** | Linear approximation of non-linear primitives | Computes Linear Approximation Table (LAT) and Matsui's Piling-Up Lemma to identify maximum correlation bias $\epsilon = |p - 1/2|$ and extract key bits |
 | **Meet-in-the-Middle Attack (MITM)** | Double encryption $C = E_{K_2}(E_{K_1}(P))$ (e.g. 2DES) | Precomputes forward table $\{E_{K_1}(P) : K_1\}$ in $O(2^k)$ and matches against decrypted intermediate states $D_{K_2}(C)$ |
-
-### 🏛️ Classical Cryptanalysis Suite (`classical_crypto.py`)
 | Cipher / Method | Description | Algorithm & Technique |
 |---|---|---|
 | **Caesar Cipher** | Brute force all 25 shifts | Ranked by quadgram & Chi-squared English scoring |

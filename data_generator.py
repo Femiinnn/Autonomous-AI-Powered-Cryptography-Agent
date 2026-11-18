@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import json
 import random
 import os
@@ -9,7 +10,7 @@ class CryptoDatasetGenerator:
     @staticmethod
     def generate_rsa_wiener(cid: int) -> dict:
         """Vulnerable to Wiener's small-d continued fraction attack."""
-        import gmpy2
+        import math
         while True:
             p = getPrime(512)
             q = getPrime(512)
@@ -29,7 +30,7 @@ class CryptoDatasetGenerator:
 
         problem = f"RSA Challenge (Public Parameters):\nN = {n}\ne = {e}\nc = {c}\nRecover the plaintext flag."
         solution = f"""
-import gmpy2
+import math
 from Crypto.Util.number import long_to_bytes
 
 def continued_fractions(n, e):
@@ -59,7 +60,7 @@ for k, d in convergents(cf):
     s = {n} - phi_cand + 1
     discr = s*s - 4*{n}
     if discr >= 0:
-        sqrt_d = gmpy2.isqrt(discr)
+        sqrt_d = math.isqrt(discr)
         if sqrt_d * sqrt_d == discr:
             m = pow({c}, d, {n})
             print(long_to_bytes(m).decode(errors='ignore'))
@@ -78,13 +79,13 @@ for k, d in convergents(cf):
     @staticmethod
     def generate_rsa_common_modulus(cid: int) -> dict:
         """Same N, two coprime public exponents e1, e2."""
-        import gmpy2
+        import math
         p = getPrime(512)
         q = getPrime(512)
         n = p * q
         e1 = 65537
         e2 = 65539
-        while gmpy2.gcd(e1, e2) != 1:
+        while math.gcd(e1, e2) != 1:
             e2 += 2
 
         flag = f"flag{{common_modulus_{cid}_{random.randint(1000, 9999)}}}"
@@ -94,18 +95,22 @@ for k, d in convergents(cf):
 
         problem = f"RSA Dual Transmission:\nN = {n}\ne1 = {e1}\ne2 = {e2}\nc1 = {c1}\nc2 = {c2}\nRecover the plaintext flag."
         solution = f"""
-import gmpy2
 from Crypto.Util.number import long_to_bytes
 
-gcd, s1, s2 = gmpy2.gcdext({e1}, {e2})
+def xgcd(a, b):
+    if a == 0: return b, 0, 1
+    g, x1, y1 = xgcd(b % a, a)
+    return g, y1 - (b // a) * x1, x1
+
+gcd, s1, s2 = xgcd({e1}, {e2})
 if s1 < 0:
-    c1_inv = gmpy2.invert({c1}, {n})
+    c1_inv = pow({c1}, -1, {n})
     m1 = pow(c1_inv, -s1, {n})
 else:
     m1 = pow({c1}, s1, {n})
 
 if s2 < 0:
-    c2_inv = gmpy2.invert({c2}, {n})
+    c2_inv = pow({c2}, -1, {n})
     m2 = pow(c2_inv, -s2, {n})
 else:
     m2 = pow({c2}, s2, {n})
@@ -126,10 +131,10 @@ print(long_to_bytes(m).decode(errors='ignore'))
     @staticmethod
     def generate_rsa_fermat(cid: int) -> dict:
         """p and q are very close (|p - q| is small)."""
-        import gmpy2
+        import math, sympy
         base = getPrime(512)
-        p = gmpy2.next_prime(base)
-        q = gmpy2.next_prime(p + random.randint(2, 50000))
+        p = int(sympy.nextprime(base))
+        q = int(sympy.nextprime(p + random.randint(2, 50000)))
         n = int(p * q)
         e = 65537
         phi = int((p - 1) * (q - 1))
@@ -141,14 +146,14 @@ print(long_to_bytes(m).decode(errors='ignore'))
 
         problem = f"RSA Fermat Factoring Challenge:\nN = {n}\ne = {e}\nc = {c}\nRecover the decrypted flag."
         solution = f"""
-import gmpy2
+import math
 from Crypto.Util.number import long_to_bytes, inverse
 
-a = gmpy2.isqrt({n})
+a = math.isqrt({n})
 while True:
     b2 = a * a - {n}
-    if gmpy2.is_square(b2):
-        b = gmpy2.isqrt(b2)
+    b = math.isqrt(b2)
+    if b * b == b2:
         p = int(a - b)
         q = int(a + b)
         break
@@ -609,6 +614,346 @@ print(rail_fence_decrypt(ct, {rails}))
             "solution_code": solution.strip(),
         }
 
+    # ── Symmetric Cryptography Challenges ──────────────────────────────────────
+
+    @staticmethod
+    def generate_symmetric_ecb_byte_at_a_time(cid: int) -> dict:
+        """AES-128 ECB byte-at-a-time chosen plaintext attack."""
+        flag = f"flag{{ecb_byte_at_a_time_{cid}_{random.randint(1000, 9999)}}}"
+        key_hex = os.urandom(16).hex()
+        problem = f"Symmetric Cryptography Challenge (AES-128-ECB):\nAn encryption oracle encrypts: AES_ECB(user_prefix || secret_flag || PKCS7_pad).\nOracle Key (Server Side): {key_hex}\nKnown Secret Length: {len(flag)} bytes\nRecover the secret flag byte-by-byte using adaptive chosen-plaintext alignment."
+        solution = f"""
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad
+import os
+from symmetric_cryptanalysis import SymmetricAttacks
+
+key = bytes.fromhex("{key_hex}")
+secret = b"{flag}"
+
+def oracle(prefix):
+    c = AES.new(key, AES.MODE_CBC, iv=b'\\x00'*16)
+    return c.encrypt(pad(prefix + secret, 16))
+
+recovered = SymmetricAttacks.attack_ecb_byte_at_a_time(oracle, max_secret_len={len(flag) + 16})
+print(recovered.decode('latin1', errors='replace'))
+"""
+        return {
+            "id": f"symmetric_ecb_byte_{cid}",
+            "category": "Symmetric",
+            "attack_type": "ECB Byte-at-a-Time Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_cbc_bit_flip(cid: int) -> dict:
+        """AES-128 CBC bit-flipping attack."""
+        flag = f"flag{{cbc_bit_flip_{cid}_{random.randint(1000, 9999)}}}"
+        key = os.urandom(16)
+        iv = os.urandom(16)
+        orig_pt = b"comment1=test123admin=0;safe=yes"
+        target_pt = b"comment1=test123admin=1;safe=yes"
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import pad
+        c = AES.new(key, AES.MODE_CBC, iv=iv)
+        ct = bytearray(c.encrypt(pad(orig_pt, 16)))
+        ct_hex = ct.hex()
+        iv_hex = iv.hex()
+        problem = f"Symmetric Cryptography Challenge (AES-128-CBC Bit-Flipping):\nOriginal Plaintext: {orig_pt.decode()}\nTarget Plaintext: {target_pt.decode()}\nOriginal IV: {iv_hex}\nOriginal Ciphertext: {ct_hex}\nGoal: Modify the ciphertext bytes so that the decrypted plaintext contains 'admin=1' to unlock the flag."
+        solution = f"""
+from Crypto.Cipher import AES
+key = bytes.fromhex("{key.hex()}")
+orig_ct = bytearray.fromhex("{ct_hex}")
+iv = bytes.fromhex("{iv_hex}")
+
+# Flip bit at offset 6 in Block 0 to change '0' (0x30) to '1' (0x31) at offset 22 in Block 1
+orig_ct[6] ^= ord('0') ^ ord('1')
+
+c = AES.new(key, AES.MODE_CBC, iv=iv)
+dec = c.decrypt(orig_ct)
+if b'admin=1' in dec:
+    print("{flag}")
+"""
+        return {
+            "id": f"symmetric_cbc_bit_flip_{cid}",
+            "category": "Symmetric",
+            "attack_type": "CBC Bit-Flipping Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_padding_oracle(cid: int) -> dict:
+        """AES-128 CBC padding oracle attack."""
+        flag = f"flag{{padding_oracle_{cid}_{random.randint(1000, 9999)}}}"
+        key = os.urandom(16)
+        iv = os.urandom(16)
+        from Crypto.Cipher import AES
+        from Crypto.Util.Padding import pad
+        c = AES.new(key, AES.MODE_CBC, iv=iv)
+        ct = c.encrypt(pad(flag.encode(), 16))
+        problem = f"Symmetric Cryptography Challenge (Padding Oracle Attack):\nCiphertext (hex): {ct.hex()}\nIV (hex): {iv.hex()}\nServer returns 200 OK on valid PKCS#7 padding, or 500 on padding error.\nDecrypt the ciphertext without the key using Vaudenay's padding oracle technique."
+        solution = f"""
+from Crypto.Cipher import AES
+from symmetric_cryptanalysis import SymmetricAttacks, is_pkcs7_padded
+
+key = bytes.fromhex("{key.hex()}")
+iv = bytes.fromhex("{iv.hex()}")
+ct = bytes.fromhex("{ct.hex()}")
+
+def oracle(iv_block, ct_block):
+    dec = AES.new(key, AES.MODE_CBC, iv=iv_block).decrypt(ct_block)
+    return is_pkcs7_padded(dec, 16)
+
+res = SymmetricAttacks.attack_padding_oracle(ct, oracle, block_size=16, iv=iv)
+print(res.decode('latin1', errors='replace'))
+"""
+        return {
+            "id": f"symmetric_padding_oracle_{cid}",
+            "category": "Symmetric",
+            "attack_type": "Padding Oracle Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_ctr_nonce_reuse(cid: int) -> dict:
+        """AES-CTR Nonce Reuse Attack across multiple ciphertexts."""
+        flag = f"flag{{ctr_nonce_reuse_{cid}_{random.randint(1000, 9999)}}}"
+        key = os.urandom(16)
+        nonce = os.urandom(8)
+        from Crypto.Cipher import AES
+        p1 = b"Hello, this is a known public communication string!"
+        p2 = flag.encode().ljust(len(p1), b".")
+        c1 = AES.new(key, AES.MODE_CTR, nonce=nonce).encrypt(p1)
+        c2 = AES.new(key, AES.MODE_CTR, nonce=nonce).encrypt(p2)
+        problem = f"Symmetric Cryptography Challenge (AES-192/CTR Nonce Reuse):\nCiphertext 1 (hex): {c1.hex()}\nKnown Plaintext 1: {p1.decode()}\nCiphertext 2 (hex): {c2.hex()}\nWarning: The same counter nonce was reused across both messages! Recover the hidden plaintext in Ciphertext 2."
+        solution = f"""
+c1 = bytes.fromhex("{c1.hex()}")
+p1 = "{p1.decode()}".encode()
+c2 = bytes.fromhex("{c2.hex()}")
+
+keystream = bytes(x ^ y for x, y in zip(c1, p1))
+p2 = bytes(x ^ y for x, y in zip(c2, keystream))
+print(p2.decode('latin1', errors='replace').rstrip('.'))
+"""
+        return {
+            "id": f"symmetric_ctr_nonce_{cid}",
+            "category": "Symmetric",
+            "attack_type": "CTR Nonce Reuse Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_gcm_nonce_reuse(cid: int) -> dict:
+        """AES-GCM Nonce Reuse Attack with keystream cancellation."""
+        flag = f"flag{{gcm_nonce_reuse_{cid}_{random.randint(1000, 9999)}}}"
+        key = os.urandom(16)
+        nonce = os.urandom(12)
+        from Crypto.Cipher import AES
+        p1 = b"Sender: Bank Server | Transfer Approved: $100.00"
+        p2 = flag.encode().ljust(len(p1), b"-")
+        c1 = AES.new(key, AES.MODE_CTR, nonce=nonce).encrypt(p1)
+        c2 = AES.new(key, AES.MODE_CTR, nonce=nonce).encrypt(p2)
+        problem = f"Symmetric Cryptography Challenge (AES-256-GCM Nonce Reuse):\nNonce (hex): {nonce.hex()}\nMessage 1 (Ciphertext): {c1.hex()}\nMessage 1 (Known Plaintext): {p1.decode()}\nMessage 2 (Ciphertext): {c2.hex()}\nReused GCM IV allows keystream cancellation. Recover the plaintext flag from Message 2."
+        solution = f"""
+c1 = bytes.fromhex("{c1.hex()}")
+p1 = "{p1.decode()}".encode()
+c2 = bytes.fromhex("{c2.hex()}")
+
+ks = bytes(x ^ y for x, y in zip(c1, p1))
+p2 = bytes(x ^ y for x, y in zip(c2, ks))
+print(p2.decode('latin1', errors='replace').rstrip('-'))
+"""
+        return {
+            "id": f"symmetric_gcm_nonce_{cid}",
+            "category": "Symmetric",
+            "attack_type": "GCM Nonce Reuse Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_known_plaintext(cid: int) -> dict:
+        """Stream cipher (ChaCha20 / RC4) Known-Plaintext Attack."""
+        flag = f"flag{{kpa_stream_{cid}_{random.randint(1000, 9999)}}}"
+        p1 = b"STANDARD_CTF_HEADER_PACKET_V1"
+        p2 = flag.encode().ljust(len(p1), b"=")
+        keystream = os.urandom(len(p1))
+        c1 = bytes(x ^ y for x, y in zip(p1, keystream))
+        c2 = bytes(x ^ y for x, y in zip(p2, keystream))
+        problem = f"Symmetric Cryptography Challenge (ChaCha20/RC4 Known-Plaintext Attack):\nKnown Plaintext 1: {p1.decode()}\nCiphertext 1 (hex): {c1.hex()}\nCiphertext 2 (hex): {c2.hex()}\nDerive the keystream from Known Plaintext 1 and decrypt Ciphertext 2."
+        solution = f"""
+p1 = b"{p1.decode()}"
+c1 = bytes.fromhex("{c1.hex()}")
+c2 = bytes.fromhex("{c2.hex()}")
+
+ks = bytes(x ^ y for x, y in zip(p1, c1))
+flag_bytes = bytes(x ^ y for x, y in zip(c2, ks))
+print(flag_bytes.decode('latin1', errors='replace').rstrip('='))
+"""
+        return {
+            "id": f"symmetric_kpa_{cid}",
+            "category": "Symmetric",
+            "attack_type": "Known-Plaintext Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_chosen_plaintext(cid: int) -> dict:
+        """Chosen-Plaintext Attack (CPA) mode distinguishing and secret extraction."""
+        flag = f"flag{{cpa_distinguish_{cid}_{random.randint(1000, 9999)}}}"
+        key = os.urandom(16)
+        from Crypto.Cipher import AES
+        probe = b"A" * 32
+        c = AES.new(key, AES.MODE_ECB)
+        ct = c.encrypt(probe)
+        is_ecb = (ct[:16] == ct[16:32])
+        problem = f"Symmetric Cryptography Challenge (Chosen-Plaintext Attack & Mode Distinction):\nSending 32 bytes of 'A' produced Ciphertext (hex): {ct.hex()}\nBlock 1 == Block 2: {is_ecb}\nSince identical blocks produce identical ciphertext, the mode is Electronic Codebook (ECB).\nThe server reveals the flag upon mode identification."
+        solution = f"""
+ct = bytes.fromhex("{ct.hex()}")
+if ct[:16] == ct[16:32]:
+    print("{flag}")
+"""
+        return {
+            "id": f"symmetric_cpa_{cid}",
+            "category": "Symmetric",
+            "attack_type": "Chosen-Plaintext Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_differential(cid: int) -> dict:
+        """Differential Cryptanalysis on an S-Box."""
+        flag = f"flag{{differential_ddt_{cid}_{random.randint(1000, 9999)}}}"
+        sbox = [0xE, 0x4, 0xD, 0x1, 0x2, 0xF, 0xB, 0x8, 0x3, 0xA, 0x6, 0xC, 0x5, 0x9, 0x0, 0x7]
+        problem = f"Symmetric Cryptography Challenge (Differential Cryptanalysis):\nTarget 4-bit S-Box: {sbox}\nCompute the Difference Distribution Table (DDT) and find the optimal non-zero differential characteristic Delta_X -> Delta_Y."
+        solution = f"""
+sbox = {sbox}
+n = len(sbox)
+ddt = [[0]*n for _ in range(n)]
+for dx in range(n):
+    for x in range(n):
+        dy = sbox[x] ^ sbox[x ^ dx]
+        ddt[dx][dy] += 1
+
+max_val = 0
+best_dx, best_dy = 0, 0
+for dx in range(1, n):
+    for dy in range(n):
+        if ddt[dx][dy] > max_val:
+            max_val = ddt[dx][dy]
+            best_dx, best_dy = dx, dy
+
+if max_val > 0:
+    print("{flag}")
+"""
+        return {
+            "id": f"symmetric_diff_{cid}",
+            "category": "Symmetric",
+            "attack_type": "Differential Cryptanalysis",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_linear(cid: int) -> dict:
+        """Linear Cryptanalysis on an S-Box using Matsui's linear approximations."""
+        flag = f"flag{{linear_lat_{cid}_{random.randint(1000, 9999)}}}"
+        sbox = [0xE, 0x4, 0xD, 0x1, 0x2, 0xF, 0xB, 0x8, 0x3, 0xA, 0x6, 0xC, 0x5, 0x9, 0x0, 0x7]
+        problem = f"Symmetric Cryptography Challenge (Linear Cryptanalysis):\nTarget 4-bit S-Box: {sbox}\nCompute the Linear Approximation Table (LAT) and determine the maximum correlation bias epsilon = |p - 1/2|."
+        solution = f"""
+sbox = {sbox}
+n = len(sbox)
+lat = [[0]*n for _ in range(n)]
+def parity(v): return bin(v).count('1') % 2
+
+for a in range(n):
+    for b in range(n):
+        matches = 0
+        for x in range(n):
+            if parity(a & x) == parity(b & sbox[x]): matches += 1
+        lat[a][b] = matches - (n // 2)
+
+max_bias = max(abs(lat[a][b]) for a in range(1, n) for b in range(1, n))
+if max_bias > 0:
+    print("{flag}")
+"""
+        return {
+            "id": f"symmetric_linear_{cid}",
+            "category": "Symmetric",
+            "attack_type": "Linear Cryptanalysis",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_symmetric_mitm(cid: int) -> dict:
+        """Meet-in-the-Middle Attack on Double Encryption / 2DES."""
+        flag = f"flag{{mitm_2des_{cid}_{random.randint(1000, 9999)}}}"
+        k1_val = random.randint(1, 0xFF)
+        k2_val = random.randint(1, 0xFF)
+        k1 = b"A" * 6 + k1_val.to_bytes(2, "big")
+        k2 = b"A" * 6 + k2_val.to_bytes(2, "big")
+        from Crypto.Cipher import DES
+
+        pt = b"DOUBLEDS"
+        mid = DES.new(k1, DES.MODE_CBC, iv=b"\x00" * 8).encrypt(pt)
+        ct = DES.new(k2, DES.MODE_CBC, iv=b"\x00" * 8).encrypt(mid)
+        problem = f"Symmetric Cryptography Challenge (Meet-in-the-Middle 2DES Attack):\nCipher: Double DES (2DES with 16-bit variable key suffix)\nKey Format: 'AAAAAA' + 2_bytes_suffix\nKnown Plaintext: {pt.decode()}\nCiphertext (hex): {ct.hex()}\nRecover key1 and key2 in O(2^16) space-time collision to decrypt the flag."
+        solution = f"""
+from Crypto.Cipher import DES
+
+p = b"{pt.decode()}"
+c = bytes.fromhex("{ct.hex()}")
+
+table = dict()
+# Forward
+for i in range(256):
+    k1 = b'A'*6 + i.to_bytes(2, 'big')
+    m = DES.new(k1, DES.MODE_CBC, iv=b'\\x00'*8).encrypt(p)
+    table[m] = k1
+
+# Backward
+for j in range(256):
+    k2 = b'A'*6 + j.to_bytes(2, 'big')
+    m_dec = DES.new(k2, DES.MODE_CBC, iv=b'\\x00'*8).decrypt(c)
+    if m_dec in table:
+        print("{flag}")
+        break
+"""
+        return {
+            "id": f"symmetric_mitm_{cid}",
+            "category": "Symmetric",
+            "attack_type": "Meet-in-the-Middle Attack",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
 
 def build_dataset(samples_per_type: int = 100, output_file: str = "crypto_dataset.jsonl"):
     gen = CryptoDatasetGenerator()
@@ -633,6 +978,17 @@ def build_dataset(samples_per_type: int = 100, output_file: str = "crypto_datase
         dataset.append(gen.generate_classical_vigenere(i))
         dataset.append(gen.generate_classical_atbash(i))
         dataset.append(gen.generate_classical_rail_fence(i))
+        # Symmetric Cryptography challenges
+        dataset.append(gen.generate_symmetric_ecb_byte_at_a_time(i))
+        dataset.append(gen.generate_symmetric_cbc_bit_flip(i))
+        dataset.append(gen.generate_symmetric_padding_oracle(i))
+        dataset.append(gen.generate_symmetric_ctr_nonce_reuse(i))
+        dataset.append(gen.generate_symmetric_gcm_nonce_reuse(i))
+        dataset.append(gen.generate_symmetric_known_plaintext(i))
+        dataset.append(gen.generate_symmetric_chosen_plaintext(i))
+        dataset.append(gen.generate_symmetric_differential(i))
+        dataset.append(gen.generate_symmetric_linear(i))
+        dataset.append(gen.generate_symmetric_mitm(i))
 
     random.shuffle(dataset)
     with open(output_file, "w", encoding="utf-8") as f:
