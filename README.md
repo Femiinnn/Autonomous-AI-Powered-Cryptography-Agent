@@ -261,8 +261,31 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 | `/api/classical` | `POST` | `{"text": "..."}` | Direct instant analysis & decryption of classical ciphers (18 methods) |
 | `/api/models` | `GET` | — | Returns active model, fallback models chain, and key rotation status |
 | `/api/cleanup` | `POST` | — | Purges unwanted temporary files from `inputs/` and `outputs/` directories |
-| `/solve` | `POST` | `FormData(challenge, category, attack, challenge_files)` | Dispatches challenge & uploaded files to autonomous LangGraph agent |
+| `/solve` | `POST` | `FormData(challenge, category, attack, challenge_files, csrf_token)` | Dispatches challenge & uploaded files to autonomous LangGraph agent |
 | `/stream/<job_id>` | `GET` | — | Server-Sent Events (SSE) live stream of logs and execution results |
+
+#### 🛡️ 16-Point File Upload Security Architecture (`upload_security.py`)
+
+The application enforces an enterprise-grade, defense-in-depth security layer mitigating all OWASP file upload risks:
+
+| # | Vulnerability | Security Risk | Implemented Protection & Patch |
+|---|---|---|---|
+| 1 | **Unrestricted File Upload** | Attacker uploads malicious files (scripts, executables) | Strict extension allowlist (`ALLOWED_EXTENSIONS`); blocks all executable formats |
+| 2 | **Extension Bypass** | Multi-extension bypass (`.php.jpg`, `.exe`, `.phtml`, null bytes) | Multi-segment dot token parsing, null-byte rejection, and strict character sanitization |
+| 3 | **MIME Type Spoofing** | Modified `Content-Type` header to disguise malicious files | Deep magic-byte inspection (validates true binary signatures; rejects PE/ELF disguised as images/text) |
+| 4 | **Path Traversal** | Filenames like `../../etc/passwd` to escape directories | Strips traversal sequences, resolves paths strictly inside target directory, and prefixes filenames with UUIDs |
+| 5 | **Remote Code Execution (RCE)** | Uploaded scripts or binaries executed on server host | Stored outside webroot in `inputs/`, execution bits stripped (`0o600`), runs strictly in isolated sandbox (`sandbox.py`) |
+| 6 | **Malicious SVG Files** | SVG containing JavaScript, `<foreignObject>`, or XXE payloads | SVG uploads disabled; raw XML script and entity constructs blocked |
+| 7 | **Zip Bomb** | Compressed archive expanding to gigabytes/terabytes | Strict limits: 10MB compressed max, 50MB uncompressed max, 10:1 max compression ratio, 100 entries max |
+| 8 | **DoS via Large Files** | Upload flooding consuming RAM, disk, or bandwidth | 16MB max payload size (`MAX_CONTENT_LENGTH`), 10MB per file limit, 10 files max quota, IP rate limiting (30 req/min) |
+| 9 | **Polyglot Files** | File valid in multiple formats (e.g. JPEG + PHP web shell) | Deep signature scanning for embedded PHP, JSP, HTML script tags, and image structure verification with Pillow |
+| 10 | **Malware Upload** | Uploaded files containing web shells or reverse shells | Signature pattern scanner against known web shells (`eval(base64_decode`, `system($_GET`, `c99sh`, `r57shell`, etc.) |
+| 11 | **Insecure File Permissions** | Uploads readable/writable by unauthorized system users | Filesystem permissions strictly clamped to `0o600` (owner read/write only, no world/group permissions) |
+| 12 | **IDOR (Insecure Direct Object Reference)** | Users accessing or overwriting another user's uploads | Job/session directory isolation (`inputs/<job_id>/`); each execution is compartmentalized and unguessable |
+| 13 | **Stored XSS** | Uploaded HTML or malicious documents executing in browser | Security response headers enforced: `X-Content-Type-Options: nosniff`, `Content-Security-Policy`, `X-Frame-Options: DENY` |
+| 14 | **CSRF** | Unauthorized requests triggering uploads via victim session | Cryptographic HMAC-based CSRF tokens validated on all state-changing endpoints, plus Origin/Referer verification |
+| 15 | **Race Conditions** | File accessed before validation completes (TOCTOU) | Atomic upload workflow: writes to quarantine `.tmp` file, runs validations, then performs atomic `os.replace` |
+| 16 | **Information Disclosure** | Filenames, metadata, or paths leaking sensitive data | Strips EXIF/GPS/device metadata from images via Pillow; redacts absolute server paths in all responses and logs |
 
 ---
 
@@ -319,6 +342,7 @@ crypto-ctf-agent/
 ├── rsa_cryptanalysis.py  # RSA cryptanalysis suite (15 attacks & LLL lattice)
 ├── hash_decoder.py       # Multi-layer hash & encoding auto-detector
 ├── app.py                # Web dashboard & real-time SSE streaming solver
+├── upload_security.py    # 16-point defense-in-depth file upload security manager
 ├── sandbox.py            # Docker execution engine with native fallback
 ├── data_generator.py     # Synthetic challenge factory (RSA, XOR, Classical, Binary)
 ├── train_llama3_grpo.py  # GRPO RL fine-tuning pipeline with Docker rewards

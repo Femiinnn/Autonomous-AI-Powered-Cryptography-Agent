@@ -43,6 +43,7 @@ class CryptoAgentState(TypedDict):
     rsa_analysis: Optional[dict]        # full report from rsa_cryptanalysis
     ecc_analysis: Optional[dict]        # full report from ecc_cryptanalysis
     symmetric_analysis: Optional[dict]  # full report from symmetric_cryptanalysis
+    job_id: Optional[str]              # Isolated job ID for sandboxed challenge files
 
 
 # ── Hash, Encoding, Classical, RSA, ECC & Symmetric Detection Node ──────────
@@ -567,7 +568,7 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
         has_sage_keyword = bool(re.search(r"\b(import\s+sage|from\s+sage|IntegerRing|PolynomialRing|Zmod)\b", code))
         is_sage = state.get("is_sage", False) and has_sage_keyword
 
-    res = sandbox.execute(code=code, is_sage=is_sage, allow_network=False)
+    res = sandbox.execute(code=code, is_sage=is_sage, allow_network=False, job_id=state.get("job_id"))
     stdout = res["stdout"]
     stderr = res["stderr"]
 

@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token }}" />
   <title>CryptoAgent — Autonomous CTF Cryptanalysis</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;1,400&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
@@ -358,6 +359,26 @@ textarea:focus{
   transition:all var(--transition);margin-left:8px;
 }
 .file-remove-btn:hover{color:var(--rose);background:rgba(244,63,94,.15);}
+
+/* 16-Point Defense-in-Depth Upload Security Banner */
+.upload-sec-banner{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  margin-top:12px;padding:9px 13px;border-radius:var(--radius-sm);
+  background:rgba(6,182,212,.05);border:1px solid rgba(6,182,212,.18);
+  font-size:11px;color:var(--text-2);
+}
+.sec-shield-icon{
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:14px;color:var(--cyan-l);font-weight:700;
+}
+.sec-tag{
+  font-size:10px;font-weight:700;letter-spacing:.4px;
+  background:rgba(6,182,212,.15);color:var(--cyan-l);
+  padding:2px 7px;border-radius:4px;font-family:'JetBrains Mono',monospace;
+}
+.sec-details{
+  font-size:10.5px;color:var(--text-3);line-height:1.4;
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    CATEGORY GRID
@@ -957,7 +978,13 @@ textarea:focus{
           <span class="format-tag">🔒 .enc / .bin / .hex</span>
           <span class="format-tag">📄 .txt / .out / .json</span>
           <span class="format-tag">🖼️ .png / .jpg / .bmp</span>
-          <span class="format-tag">📦 .zip / .pcap</span>
+          <span class="format-tag">📦 .zip (Safe Decompress)</span>
+        </div>
+
+        <div class="upload-sec-banner">
+          <span class="sec-shield-icon">🛡️</span>
+          <span class="sec-tag">16-POINT DEFENSE ACTIVE</span>
+          <span class="sec-details">Magic Byte &amp; Extension Validation • Anti-Polyglot &amp; Zip-Bomb Protection • EXIF Stripped • Isolated Sandbox Execution</span>
         </div>
 
         <div class="file-list-wrap" id="file-list-wrap" style="display:none;">
@@ -1505,10 +1532,42 @@ function renderFileList() {
   });
 }
 
+const DANGEROUS_EXTS = ['exe', 'bat', 'cmd', 'ps1', 'vbs', 'sh', 'php', 'phtml', 'dll', 'so', 'msi', 'scr', 'svg', 'html', 'htm', 'js', 'jar', 'war', 'jsp', 'asp', 'aspx', 'cgi'];
+
 function addFiles(newFiles) {
   if (!newFiles || newFiles.length === 0) return;
+  const MAX_PER_FILE = 10 * 1024 * 1024; // 10MB
+  const MAX_FILES = 10;
+
   for (let i = 0; i < newFiles.length; i++) {
     const f = newFiles[i];
+
+    // File count quota
+    if (uploadedFiles.length >= MAX_FILES) {
+      appendLog(`⚠️ Upload limit: Maximum ${MAX_FILES} files allowed. Skipped '${f.name}'.`, 't-warn');
+      break;
+    }
+
+    // Individual file size limit
+    if (f.size > MAX_PER_FILE) {
+      appendLog(`❌ File '${f.name}' exceeds the 10 MB limit (${(f.size/1048576).toFixed(1)} MB).`, 't-err');
+      continue;
+    }
+
+    // Extension and double extension validation
+    const parts = f.name.toLowerCase().split('.');
+    if (parts.length > 1) {
+      let isDangerous = false;
+      for (let p = 1; p < parts.length; p++) {
+        if (DANGEROUS_EXTS.includes(parts[p])) {
+          appendLog(`🛡️ Security Block: Disallowed script/executable extension '.${parts[p]}' in '${f.name}'.`, 't-err');
+          isDangerous = true;
+          break;
+        }
+      }
+      if (isDangerous) continue;
+    }
+
     const exists = uploadedFiles.some(existing => existing.name === f.name && existing.size === f.size);
     if (!exists) {
       uploadedFiles.push(f);
@@ -1647,7 +1706,9 @@ btnSubmit.addEventListener('click', async () => {
   // Scroll to progress
   document.getElementById('progress-card').scrollIntoView({behavior:'smooth',block:'nearest'});
 
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
   const fd = new FormData();
+  fd.append('csrf_token', csrfToken);
   fd.append('challenge', text);
   fd.append('category', selectedCategory());
   fd.append('attack', selectedAttack());
@@ -1660,9 +1721,21 @@ btnSubmit.addEventListener('click', async () => {
 
   let jobId;
   try {
-    const r = await fetch('/solve', {method:'POST', body:fd});
+    const r = await fetch('/solve', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrfToken },
+      body: fd
+    });
     const d = await r.json();
-    if (d.error) { appendLog('Error: ' + d.error, 't-err'); setBusy(false); return; }
+    if (d.error) {
+      if (d.vulnerability) {
+        appendLog(`🛡️ [Blocked ${d.vulnerability}]: ${d.error}`, 't-err');
+      } else {
+        appendLog('Error: ' + d.error, 't-err');
+      }
+      setBusy(false);
+      return;
+    }
     jobId = d.job_id;
   } catch(e) { appendLog('Network error: ' + e.message, 't-err'); setBusy(false); return; }
 
@@ -1724,7 +1797,11 @@ document.getElementById('btn-clear-input')?.addEventListener('click', () => {
   uploadedFiles = [];
   renderFileList();
   if (fileInput) fileInput.value = '';
-  fetch('/api/cleanup', {method: 'POST'}).catch(()=>{});
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  fetch('/api/cleanup', {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': csrfToken }
+  }).catch(()=>{});
 });
 
 /* ── Clear Output Column ──────────────────────────────────────────────────── */
@@ -1754,7 +1831,11 @@ document.getElementById('btn-clear-output')?.addEventListener('click', () => {
   const n3 = document.getElementById('s-execute')?.querySelector('.step-node'); if (n3) n3.textContent = '3';
   const n4 = document.getElementById('s-result')?.querySelector('.step-node'); if (n4) n4.textContent = '4';
   pipelineSub.textContent = 'Waiting for challenge…';
-  fetch('/api/cleanup', {method: 'POST'}).catch(()=>{});
+  const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  fetch('/api/cleanup', {
+    method: 'POST',
+    headers: { 'X-CSRF-Token': csrfToken }
+  }).catch(()=>{});
 });
 
 /* ── Show result ──────────────────────────────────────────────────────────── */

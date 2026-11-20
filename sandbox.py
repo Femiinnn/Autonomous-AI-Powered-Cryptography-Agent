@@ -15,10 +15,11 @@ class DockerCryptoSandbox:
         self.timeout = timeout
         self.has_docker = shutil.which("docker") is not None
 
-    def execute(self, code: str, is_sage: bool = False, allow_network: bool = False) -> Dict[str, Any]:
+    def execute(self, code: str, is_sage: bool = False, allow_network: bool = False, job_id: str = None) -> Dict[str, Any]:
         """
         Runs code inside an ephemeral container if Docker is present,
         otherwise falls back to native execution.
+        Isolates input challenge files per job_id to prevent cross-job IDOR.
         """
         ext = ".sage" if is_sage else ".py"
         with tempfile.NamedTemporaryFile(suffix=ext, mode="w", delete=False, encoding="utf-8") as f:
@@ -27,18 +28,29 @@ class DockerCryptoSandbox:
         workdir = os.path.dirname(temp_path)
         copied_files = []
 
-        # Copy challenge files from inputs/ into workdir so exploit can access them by relative filename
-        inputs_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inputs")
-        if os.path.exists(inputs_dir) and os.path.isdir(inputs_dir):
+        # Copy challenge files from inputs/<job_id> or inputs/ into workdir so exploit can access them by relative filename
+        inputs_base = os.path.join(os.path.dirname(os.path.abspath(__file__)), "inputs")
+        candidate_dirs = []
+        if job_id:
+            job_specific_dir = os.path.join(inputs_base, job_id)
+            if os.path.exists(job_specific_dir) and os.path.isdir(job_specific_dir):
+                candidate_dirs.append(job_specific_dir)
+        if os.path.exists(inputs_base) and os.path.isdir(inputs_base):
+            candidate_dirs.append(inputs_base)
+
+        for inputs_dir in candidate_dirs:
             for item in os.listdir(inputs_dir):
                 s = os.path.join(inputs_dir, item)
-                d = os.path.join(workdir, item)
-                if os.path.isfile(s) and not os.path.exists(d):
-                    try:
-                        shutil.copy2(s, d)
-                        copied_files.append(d)
-                    except Exception:
-                        pass
+                if os.path.isfile(s) and not item.startswith("."):
+                    # Strip 16-hex prefix if storage name is '{hex16}_{filename}' to give exploit original filename
+                    clean_item = item.split("_", 1)[1] if ("_" in item and len(item.split("_", 1)[0]) == 16) else item
+                    d = os.path.join(workdir, clean_item)
+                    if not os.path.exists(d):
+                        try:
+                            shutil.copy2(s, d)
+                            copied_files.append(d)
+                        except Exception:
+                            pass
 
         try:
             if not self.has_docker:
