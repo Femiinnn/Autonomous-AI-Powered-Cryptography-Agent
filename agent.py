@@ -4,7 +4,12 @@ import shutil
 from typing import TypedDict, Optional
 from langchain_core.messages import SystemMessage, HumanMessage
 from langchain_openai import ChatOpenAI
-from langgraph.graph import StateGraph, END
+try:
+    from langgraph.graph import StateGraph, END
+    HAS_LANGGRAPH = True
+except (ImportError, OSError):
+    HAS_LANGGRAPH = False
+    END = "__END__"
 from sandbox import DockerCryptoSandbox
 
 # Load environment variables if .env is present
@@ -81,6 +86,30 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
         summary = full_analysis.get("summary", "")
         if summary and not is_math_rsa:
             print(f"  📊 Hash/Encoding: {summary}")
+
+        # Check if recursive decoding uncovered a genuine flag immediately
+        final_dec = full_analysis.get("final_decoded")
+        if final_dec and final_dec.strip() != challenge.strip():
+            flag_match = re.search(r'(flag\{.*?\}|ctf\{.*?\})', final_dec, re.IGNORECASE)
+            if flag_match:
+                verified_flag = flag_match.group(1)
+                solved_category = "Encoding & Data Transformation"
+                solved_attack = f"Recursive Decoding ({summary})"
+                solved_code = f"# Solved directly via recursive multi-layer decoding\nprint('{verified_flag}')\n"
+                print(f"  🚩 VERIFIED FLAG RECOVERED via Recursive Decoding: {verified_flag}")
+
+        if not verified_flag:
+            for sub in sub_analyses:
+                sub_dec = sub.get("final_decoded")
+                if sub_dec:
+                    flag_match = re.search(r'(flag\{.*?\}|ctf\{.*?\})', sub_dec, re.IGNORECASE)
+                    if flag_match:
+                        verified_flag = flag_match.group(1)
+                        solved_category = "Encoding & Data Transformation"
+                        solved_attack = f"Substring Recursive Decoding ({sub.get('summary', 'Decoded')})"
+                        solved_code = f"# Solved directly via substring recursive decoding\nprint('{verified_flag}')\n"
+                        print(f"  🚩 VERIFIED FLAG RECOVERED via Substring Decoding: {verified_flag}")
+                        break
     except Exception as e:
         print(f"  ⚠️ Hash/Encoding detection error: {e}")
         hash_analysis = {"full": {}, "substrings": [], "error": str(e)}
@@ -90,10 +119,11 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
     rsa_res = {}
     ecc_res = {}
     symmetric_res = {}
-    verified_flag = None
-    solved_category = "Classical Cryptography"
-    solved_attack = "Direct Cryptanalysis"
-    solved_code = ""
+    if not verified_flag:
+        verified_flag = None
+    solved_category = solved_category if verified_flag else "Classical Cryptography"
+    solved_attack = solved_attack if verified_flag else "Direct Cryptanalysis"
+    solved_code = solved_code if verified_flag else ""
 
     if not is_math_rsa:
         try:
@@ -233,8 +263,8 @@ def classify_and_plan(state: CryptoAgentState) -> dict:
                     hash_ctx += f"\n  - Hash detected: possible algorithms: {', '.join(a['algorithm'] for a in algos[:3])}"
                 elif decoded:
                     hash_ctx += f"\n  - Layer {layer.get('layer','')} [{enc}] decoded: {decoded[:100]}"
-        if full_ha.get("is_double_encoded"):
-            hash_ctx += "\n  ⚠️  DOUBLE ENCODING DETECTED — multiple decode passes required."
+        if full_ha.get("is_multi_encoded") or full_ha.get("is_double_encoded"):
+            hash_ctx += f"\n  ⚠️  RECURSIVE MULTI-LAYER ENCODING DETECTED ({full_ha.get('total_layers', '')} layers) — peeling sequence: {full_ha.get('summary', '')}"
         for sub in (ha.get("substrings") or [])[:2]:
             fd = sub.get("final_decoded", "")
             enc0 = (sub.get("encoding_layers") or [{}])[0].get("encoding", "")
@@ -463,11 +493,16 @@ def generate_solver(state: CryptoAgentState) -> dict:
                 enc_steps.append(f"Decode {enc}")
         if enc_steps:
             hash_hint = f"\n[Encoding/Hash Hint] Required decode steps: {' → '.join(enc_steps)}"
-            if full_ha.get("is_double_encoded"):
-                hash_hint += "\n⚠️ This is DOUBLE ENCODED — apply decoding in the correct sequence."
+            if full_ha.get("is_multi_encoded") or full_ha.get("is_double_encoded"):
+                hash_hint += "\n⚠️ MULTI-LAYER RECURSIVE ENCODING DETECTED — apply decoding in the exact sequence shown."
             fd = full_ha.get("final_decoded", "")
             if fd and fd != state["challenge"].strip():
-                hash_hint += f"\nPre-decoded value available: {fd[:200]}"
+                hash_hint += f"\nPre-decoded value available from hash_decoder:\n{fd[:300]}"
+            hash_hint += (
+                "\nAvailable importable helpers from hash_decoder:\n"
+                "  - analyze_hash_or_encoding(text), extract_encoded_strings(text)\n"
+                "  - Supports Base64, Base32, Base16, Hex, Binary, ASCII/Unicode escapes, URL, Base85, Base58, Morse, Decimal ASCII, ROT1..25, ROT47, UTF-8, Gzip, Zlib.\n"
+            )
 
     # Inject classical cryptanalysis hints into the solver prompt
     classical_hint = ""
@@ -620,28 +655,74 @@ def evaluation_router(state: CryptoAgentState) -> str:
         return "classify"
     return "generate_solver"
 
-# --- Graph Assembly ---
-builder = StateGraph(CryptoAgentState)
-builder.add_node("hash_detect",    detect_hash_or_encoding)   # Pre-step: Hash, Encoding & Statistical Analysis
-builder.add_node("classify",       classify_and_plan)
-builder.add_node("generate_solver",generate_solver)
-builder.add_node("execute_docker", execute_in_docker)
+# --- Graph Assembly & Fallback Runner ---
+if HAS_LANGGRAPH:
+    builder = StateGraph(CryptoAgentState)
+    builder.add_node("hash_detect",    detect_hash_or_encoding)   # Pre-step: Hash, Encoding & Statistical Analysis
+    builder.add_node("classify",       classify_and_plan)
+    builder.add_node("generate_solver",generate_solver)
+    builder.add_node("execute_docker", execute_in_docker)
 
-builder.set_entry_point("hash_detect")
-# Only short-circuit directly to END if a verified flag was discovered in the pre-step
-builder.add_conditional_edges("hash_detect", lambda s: END if s.get("captured_flag") else "classify", {
-    END:        END,
-    "classify": "classify"
-})
-builder.add_edge("classify",       "generate_solver")
-builder.add_edge("generate_solver","execute_docker")
-builder.add_conditional_edges("execute_docker", evaluation_router, {
-    "generate_solver": "generate_solver",
-    "classify":        "classify",
-    END:               END
-})
+    builder.set_entry_point("hash_detect")
+    # Only short-circuit directly to END if a verified flag was discovered in the pre-step
+    builder.add_conditional_edges("hash_detect", lambda s: END if s.get("captured_flag") else "classify", {
+        END:        END,
+        "classify": "classify"
+    })
+    builder.add_edge("classify",       "generate_solver")
+    builder.add_edge("generate_solver","execute_docker")
+    builder.add_conditional_edges("execute_docker", evaluation_router, {
+        "generate_solver": "generate_solver",
+        "classify":        "classify",
+        END:               END
+    })
+    crypto_solver_agent = builder.compile()
+else:
+    class PurePythonCryptoAgent:
+        """Pure-Python state runner when LangGraph C-extension dependencies are restricted."""
+        def invoke(self, initial_state: dict) -> dict:
+            state: dict = {
+                "challenge": initial_state.get("challenge", ""),
+                "category": initial_state.get("category"),
+                "attack_hypothesis": initial_state.get("attack_hypothesis"),
+                "is_sage": False,
+                "generated_code": None,
+                "execution_stdout": None,
+                "execution_stderr": None,
+                "captured_flag": None,
+                "decoded_result": None,
+                "iteration": 0,
+                "max_retries": initial_state.get("max_retries", 3),
+                "hash_analysis": None,
+                "classical_analysis": None,
+                "rsa_analysis": None,
+                "ecc_analysis": None,
+                "symmetric_analysis": None,
+                "job_id": initial_state.get("job_id")
+            }
+            # Pre-step: Hash, Encoding & Direct Solvers
+            pre = detect_hash_or_encoding(state)
+            state.update(pre)
+            if state.get("captured_flag") or state.get("decoded_result"):
+                return state
 
-crypto_solver_agent = builder.compile()
+            curr = "classify"
+            while curr != END and state["iteration"] < state["max_retries"]:
+                if curr == "classify":
+                    state.update(classify_and_plan(state))
+                    curr = "generate_solver"
+                elif curr == "generate_solver":
+                    state.update(generate_solver(state))
+                    curr = "execute_docker"
+                elif curr == "execute_docker":
+                    state.update(execute_in_docker(state))
+                    next_step = evaluation_router(state)
+                    if next_step == END:
+                        break
+                    curr = next_step
+            return state
+
+    crypto_solver_agent = PurePythonCryptoAgent()
 
 if __name__ == "__main__":
     from data_generator import CryptoDatasetGenerator

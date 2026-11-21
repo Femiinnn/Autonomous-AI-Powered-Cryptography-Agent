@@ -238,6 +238,32 @@ The suite features a robust pure-Python & `pycryptodome` cryptographic engine:
 | **N-gram Scoring** | Fluent language evaluation | Quadgram, trigram, and bigram log-probability language models |
 | **Crib Dragging** | Two-time pad / key reuse attack | Slides known crib across $C_1 \oplus C_2 = P_1 \oplus P_2$ to reveal plaintext |
 
+### E. Encoding & Data Transformation Suite (`hash_decoder.py`)
+
+#### Supported Encodings & Transformations
+| Encoding / Transformation | Supported Formats & Variants | Decapsulation Technique & Behavior |
+|---|---|---|
+| **Base64 / Base32 / Base16** | Standard Base64, URL-safe Base64, RFC 4648 Base32, Base32hex, and RFC 4648 Base16 | Automatic padding calculation (`=`), byte-stream translation, and nested stream extraction |
+| **Hexadecimal** | Continuous hex, space-separated, colon-separated, C/Python escapes (`\x..`), and array literals (`[0x..]`) | Normalized byte conversion, unhexlify parsing, and raw byte stream preservation |
+| **Hex-to-Bytes Conversion** | Raw non-printable binary bytes, packed byte sequences | Bridges binary payloads directly into downstream Gzip/Zlib decompressors or cipher engines |
+| **Binary** | Continuous 8-bit/7-bit, space-separated bytes, `0b` binary literals | Byte aggregation, alignment normalization, and ASCII/UTF-8 decoding |
+| **ASCII / Unicode** | `\uXXXX`, `\UXXXXXXXX`, HTML/XML numeric character entities (`&#102;`, `&#x66;`), slash escapes | Python `unicode_escape` decoding and HTML entity unescaping |
+| **URL Encoding** | Standard percent encoding (`%XX`), plus-as-space, and IIS Unicode (`%uXXXX`) | Recursive `unquote_plus` and Unicode codepoint replacement |
+| **Base85** | RFC 1924 / Git Base85 (`b85`) and Ascii85 / Adobe Base85 (`<~...~>`, `z` zero abbreviation) | Dual-variant decoding (`b85decode` + `a85decode`) with binary payload handoff |
+| **Base58** | Bitcoin, Ripple, and Flickr alphabets | Multi-alphabet dictionary parsing with leading-zero preservation |
+| **Morse Code** | International Morse code with `.`, `-`, `_`, `/`, `|` | Word tokenization and reverse mapping to alphanumeric characters |
+| **Decimal ASCII** | Space/comma/semicolon/dash-separated integer byte values (`102 108 97 103`) | Value range filtering (0–255), printable density scoring, and ASCII char reconstruction |
+| **ROT Transformations** | All 25 Caesar shifts (ROT1–ROT25), ROT47 printable ASCII (33–126), and ROT5 digits | Exhaustive shift evaluation with automated English quadgram / flag-regex pattern scoring |
+| **UTF-8 & Mojibake** | Multi-byte UTF-8 streams and double-encoded Latin1/CP1252 text | Mojibake recovery (`encode('latin1').decode('utf-8')`) and UTF-8 validation |
+| **Gzip / Zlib** | Gzip streams (`\x1f\x8b`), Zlib streams (`\x78\x9c`, `\x78\x01`, `\x78\xda`), raw Deflate | Automated stream detection and headerless/header-based decompression |
+
+#### Recursive Multi-Layer Decoding Pipeline
+CTF challenges frequently wrap flags in multiple layers of encoding (e.g. `URL → Base64 → Gzip → Hex → Decimal ASCII`). The autonomous engine:
+- Seamlessly transitions between text strings and raw binary byte representations.
+- Recursively peels up to **15 nested encoding layers** in a single pass.
+- Employs SHA-256 cryptographic state fingerprinting to prevent infinite loops and cyclic transformations.
+- Immediately captures and verifies flags when standard CTF flag formats (`flag{...}`, `ctf{...}`) are exposed.
+
 ---
 
 ### 🌐 Web Dashboard & REST APIs (`app.py`)

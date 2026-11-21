@@ -491,6 +491,130 @@ print(long_to_bytes(secret).decode('ascii', errors='ignore'))
             "solution_code": solution.strip(),
         }
 
+    # ── Encoding & Data Transformation Challenges ────────────────────────────
+
+    @staticmethod
+    def generate_encoding_recursive_multilayer(cid: int) -> dict:
+        """Recursive multi-layer encoding: URL -> Base64 -> Hex -> Decimal ASCII."""
+        import urllib.parse
+        flag = f"flag{{recursive_peel_{cid}_{random.randint(1000, 9999)}}}"
+        # Layer 1: Decimal ASCII
+        l1 = " ".join(str(ord(c)) for c in flag)
+        # Layer 2: Hex
+        l2 = l1.encode().hex()
+        # Layer 3: Base64
+        import base64
+        l3 = base64.b64encode(l2.encode()).decode()
+        # Layer 4: URL encode
+        ct = urllib.parse.quote(l3)
+
+        problem = (
+            f"Encoding & Data Transformation Challenge (Recursive Multi-Layer):\n"
+            f"Encoded Payload: {ct}\n"
+            f"Identify and decode all nested layers to uncover the plaintext flag."
+        )
+        solution = f"""\
+import urllib.parse, base64, binascii
+ct = '{ct}'
+p1 = urllib.parse.unquote(ct)
+p2 = base64.b64decode(p1).decode()
+p3 = bytes.fromhex(p2).decode()
+flag = ''.join(chr(int(x)) for x in p3.split())
+print(flag)
+"""
+        return {
+            "id": f"encoding_recursive_{cid}",
+            "category": "Encoding",
+            "attack_type": "Recursive Multi-Layer Decoding",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_encoding_decimal_ascii(cid: int) -> dict:
+        """Decimal ASCII encoding (space-delimited integers)."""
+        flag = f"flag{{decimal_ascii_{cid}_{random.randint(1000, 9999)}}}"
+        ct = " ".join(str(ord(c)) for c in flag)
+        problem = (
+            f"Encoding Challenge (Decimal ASCII):\n"
+            f"Ciphertext: {ct}\n"
+            f"Convert the decimal byte codes back to ASCII to recover the flag."
+        )
+        solution = f"""\
+ct = '{ct}'
+print(''.join(chr(int(x)) for x in ct.split()))
+"""
+        return {
+            "id": f"encoding_decimal_ascii_{cid}",
+            "category": "Encoding",
+            "attack_type": "Decimal ASCII Decoding",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_encoding_gzip_base64(cid: int) -> dict:
+        """Gzip-compressed stream encapsulated in Base64."""
+        import gzip, base64
+        flag = f"flag{{gzip_zlib_stream_{cid}_{random.randint(1000, 9999)}}}"
+        gz_data = gzip.compress(flag.encode())
+        ct = base64.b64encode(gz_data).decode()
+        problem = (
+            f"Encoding Challenge (Gzip Stream in Base64):\n"
+            f"Encoded Payload: {ct}\n"
+            f"Decode Base64 and decompress the Gzip/Deflate binary stream to reveal the flag."
+        )
+        solution = f"""\
+import base64, gzip
+ct = '{ct}'
+raw = base64.b64decode(ct)
+print(gzip.decompress(raw).decode('utf-8'))
+"""
+        return {
+            "id": f"encoding_gzip_base64_{cid}",
+            "category": "Encoding",
+            "attack_type": "Gzip Decompression",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_encoding_rot47(cid: int) -> dict:
+        """ROT47 printable ASCII transformation."""
+        flag = f"flag{{rot47_printable_{cid}_{random.randint(1000, 9999)}}}"
+        rot47_chars = []
+        for c in flag:
+            code = ord(c)
+            if 33 <= code <= 126:
+                rot47_chars.append(chr(33 + ((code - 33 + 47) % 94)))
+            else:
+                rot47_chars.append(c)
+        ct = "".join(rot47_chars)
+        problem = (
+            f"Encoding Challenge (ROT47 Transformation):\n"
+            f"Ciphertext: {ct}\n"
+            f"Reverse the ROT47 printable ASCII rotation to recover the flag."
+        )
+        solution = f"""\
+ct = '{ct}'
+print(''.join(chr(33 + ((ord(c) - 33 + 47) % 94)) if 33 <= ord(c) <= 126 else c for c in ct))
+"""
+        return {
+            "id": f"encoding_rot47_{cid}",
+            "category": "Encoding",
+            "attack_type": "ROT47 Transformation",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
     # ── Classical Cryptanalysis Challenges ───────────────────────────────────
 
     @staticmethod
@@ -821,8 +945,9 @@ print(flag_bytes.decode('latin1', errors='replace').rstrip('='))
         key = os.urandom(16)
         from Crypto.Cipher import AES
         probe = b"A" * 32
-        c = AES.new(key, AES.MODE_ECB)
-        ct = c.encrypt(probe)
+        # Emulate ECB on two identical blocks without loading _raw_ecb.pyd (blocked by WDAC)
+        b1 = AES.new(key, AES.MODE_CBC, iv=b"\x00" * 16).encrypt(b"A" * 16)
+        ct = b1 + b1
         is_ecb = (ct[:16] == ct[16:32])
         problem = f"Symmetric Cryptography Challenge (Chosen-Plaintext Attack & Mode Distinction):\nSending 32 bytes of 'A' produced Ciphertext (hex): {ct.hex()}\nBlock 1 == Block 2: {is_ecb}\nSince identical blocks produce identical ciphertext, the mode is Electronic Codebook (ECB).\nThe server reveals the flag upon mode identification."
         solution = f"""
@@ -972,6 +1097,11 @@ def build_dataset(samples_per_type: int = 100, output_file: str = "crypto_datase
         dataset.append(gen.generate_binary_lsb_encode(i))
         dataset.append(gen.generate_binary_bit_rotation(i))
         dataset.append(gen.generate_binary_lsb_oracle(i))
+        # Encoding & Data Transformation challenges
+        dataset.append(gen.generate_encoding_recursive_multilayer(i))
+        dataset.append(gen.generate_encoding_decimal_ascii(i))
+        dataset.append(gen.generate_encoding_gzip_base64(i))
+        dataset.append(gen.generate_encoding_rot47(i))
         # Classical Cryptanalysis challenges
         dataset.append(gen.generate_classical_caesar(i))
         dataset.append(gen.generate_classical_affine(i))
