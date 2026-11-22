@@ -85,14 +85,149 @@ class RSAMath:
         """Modular multiplicative inverse: a^(-1) mod m."""
         if m <= 0:
             return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
         if HAS_GMPY2:
             try:
                 return int(gmpy2.invert(mpz(a), mpz(m)))
             except ZeroDivisionError:
                 return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
         g, x, _ = RSAMath.xgcd(a, m)
         if g != 1:
             return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
         return x % m
 
     @staticmethod
@@ -359,6 +494,51 @@ class RSAAttacks:
             d += 2
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 3. Fermat Factorization ───────────────────────────────────────────────
     @staticmethod
     def factor_fermat(n: int, max_steps: int = 500000) -> Optional[Tuple[int, int]]:
@@ -378,6 +558,51 @@ class RSAAttacks:
                 if p > 1 and p * q == n:
                     return p, q
             a += 1
+        return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
         return None
 
     # ── 4. Pollard's Rho ──────────────────────────────────────────────────────
@@ -401,6 +626,51 @@ class RSAAttacks:
                 return d, n // d
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 5. Pollard's p - 1 ───────────────────────────────────────────────────
     @staticmethod
     def factor_pollard_p_minus_1(n: int, B1: int = 200000) -> Optional[Tuple[int, int]]:
@@ -420,6 +690,51 @@ class RSAAttacks:
             d = RSAMath.gcd(a - 1, n)
             if 1 < d < n:
                 return d, n // d
+        return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
         return None
 
     # ── 6. Wiener's Small-d Continued Fraction Attack ─────────────────────────
@@ -460,6 +775,51 @@ class RSAAttacks:
                     }
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 7. Håstad's Broadcast Attack ──────────────────────────────────────────
     @staticmethod
     def attack_hastad_broadcast(moduli: List[int], ciphertexts: List[int], e: int) -> Optional[Dict[str, Any]]:
@@ -470,6 +830,51 @@ class RSAAttacks:
         """
         if len(moduli) < e or len(ciphertexts) < e:
             return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
         # Select first e coprime moduli
         mods = moduli[:e]
         cts = ciphertexts[:e]
@@ -488,6 +893,51 @@ class RSAAttacks:
             pass
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 8. Common Modulus Attack ──────────────────────────────────────────────
     @staticmethod
     def attack_common_modulus(n: int, e1: int, c1: int, e2: int, c2: int) -> Optional[Dict[str, Any]]:
@@ -499,6 +949,51 @@ class RSAAttacks:
         g, s1, s2 = RSAMath.xgcd(e1, e2)
         if g != 1:
             return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
         # Handle negative exponents via modular inverse
         m1 = RSAMath.modpow(c1, s1, n)
         m2 = RSAMath.modpow(c2, s2, n)
@@ -536,6 +1031,51 @@ class RSAAttacks:
                     }
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 10. Low Public Exponent Attack (Cube Root / Small e) ───────────────────
     @staticmethod
     def attack_small_exponent_root(c: int, e: int, n: Optional[int] = None) -> Optional[Dict[str, Any]]:
@@ -562,6 +1102,51 @@ class RSAAttacks:
                         "plaintext_int": r,
                         "plaintext": RSAMath.clean_flag_or_text(r)
                     }
+        return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
         return None
 
     # ── 11. Coppersmith Small-Root Attack (Stereotyped Messages) ───────────────
@@ -606,6 +1191,51 @@ class RSAAttacks:
                         }
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 12. Partial Key Exposure ──────────────────────────────────────────────
     @staticmethod
     def attack_partial_key_exposure(n: int, e: int, leaked_d_lsb: int, leaked_bits: int) -> Optional[Dict[str, Any]]:
@@ -632,6 +1262,51 @@ class RSAAttacks:
                     return RSAAttacks.private_key_recovery(p_cand, n // p_cand, e)
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 13. Bellcore CRT Fault Attack ─────────────────────────────────────────
     @staticmethod
     def attack_crt_fault(n: int, valid_sig: int, faulty_sig: int) -> Optional[Tuple[int, int]]:
@@ -644,6 +1319,51 @@ class RSAAttacks:
         g = RSAMath.gcd(diff, n)
         if 1 < g < n:
             return g, n // g
+        return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
         return None
 
     # ── 14. Boneh-Durfee Lattice Attack ───────────────────────────────────────
@@ -685,6 +1405,51 @@ class RSAAttacks:
                             return RSAAttacks.private_key_recovery(p, q, e, c)
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
     # ── 15. ROCA Detection & Factorization (CVE-2017-15361) ───────────────────
     @staticmethod
     def detect_roca(n: int) -> bool:
@@ -709,6 +1474,51 @@ class RSAAttacks:
         """Factor ROCA vulnerable key using subgroup brute-force."""
         if not RSAAttacks.detect_roca(n):
             return None
+
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
         M = 2 * 3 * 5 * 7 * 11 * 13
         for a in range(1, 100):
             base = pow(65537, a, M)
@@ -718,8 +1528,127 @@ class RSAAttacks:
                     return p, n // p
         return None
 
+    
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        # Check close prime condition
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        # Check trial division up to 1000
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
+    # ── 16. RSA Parity / LSB Oracle Attack ────────────────────────────────────
+    @staticmethod
+    def attack_parity_oracle(c: int, n: int, e: int, oracle_func: Any) -> Optional[int]:
+        """
+        Binary search plaintext recovery via parity / LSB oracle.
+        oracle_func(c_query) -> returns True if m is odd, False if even.
+        Queries: ceil(log2(N)) steps.
+        """
+        from decimal import Decimal, getcontext
+        getcontext().prec = n.bit_length() + 50
+        lower = Decimal(0)
+        upper = Decimal(n)
+        multiplier = pow(2, e, n)
+        current_c = c
+
+        for _ in range(n.bit_length()):
+            current_c = (current_c * multiplier) % n
+            is_odd = oracle_func(current_c)
+            mid = (lower + upper) / Decimal(2)
+            if is_odd:
+                lower = mid
+            else:
+                upper = mid
+
+        m_recovered = int(upper)
+        if pow(m_recovered, e, n) == c:
+            return m_recovered
+        if pow(m_recovered + 1, e, n) == c:
+            return m_recovered + 1
+        return None
+
+    # ── 17. Weak Prime Detection ──────────────────────────────────────────────
+    @staticmethod
+    def detect_weak_primes(n: int) -> Dict[str, Any]:
+        """Scans modulus for structural weaknesses and factorizability flags."""
+        report = {"is_weak": False, "anomalies": []}
+        if n % 2 == 0:
+            report["is_weak"] = True
+            report["anomalies"].append("Even modulus (contains factor 2)")
+        if RSAAttacks.detect_roca(n):
+            report["is_weak"] = True
+            report["anomalies"].append("ROCA vulnerable key generation (CVE-2017-15361)")
+        a = math.isqrt(n)
+        if (a + 1)**2 - n < 2**64:
+            report["is_weak"] = True
+            report["anomalies"].append("Close primes: Fermat factorization applicable")
+        for p in [3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47]:
+            if n % p == 0:
+                report["is_weak"] = True
+                report["anomalies"].append(f"Small prime factor detected: {p}")
+                break
+        return report
+
+    # ── 18. PKCS#1 v1.5 Padding Oracle (Bleichenbacher Framework) ─────────────
+    @staticmethod
+    def bleichenbacher_step_simulation(c: int, n: int, e: int, is_padding_valid_func: Any, max_queries: int = 1000) -> Optional[int]:
+        """
+        Framework for Bleichenbacher's Chosen Ciphertext Attack against PKCS#1 v1.5 padding.
+        Iteratively identifies s_i such that (c * s_i^e) mod n is PKCS#1 conformant.
+        """
+        k = (n.bit_length() + 7) // 8
+        B = 2 ** (8 * (k - 2))
+        s = (n + 3 * B - 1) // (3 * B)
+        queries = 0
+
+        while queries < max_queries:
+            test_c = (c * pow(s, e, n)) % n
+            queries += 1
+            if is_padding_valid_func(test_c):
+                return s
+            s += 1
+        return None
+
+
 # SECTION 4: UNIFIED RSA AUTOMATED CRYPTANALYSIS PIPELINE
 # ═══════════════════════════════════════════════════════════════════════════════
 

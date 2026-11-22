@@ -85,6 +85,9 @@ def solve():
     challenge_text = request.form.get('challenge', '').strip()
     category       = request.form.get('category', 'auto').strip()
     attack         = request.form.get('attack', 'auto').strip()
+    nc_target      = request.form.get('nc_target', '').strip()
+    if nc_target:
+        challenge_text = (challenge_text + f"\n[Remote Netcat Target: {nc_target}]").strip()
 
     # ── Handle uploaded files with 16-point Defense-in-Depth Security ─────────
     files_list = request.files.getlist('challenge_files')
@@ -295,6 +298,45 @@ def solve():
                 'explanation': sa.get('explanation', '')
             }
 
+            # ── PRNG Analysis ────────────────────────────────────────────────
+            pa = result.get('prng_analysis') or {}
+            prng_info = {
+                'status': pa.get('status', ''),
+                'generator': pa.get('generator', ''),
+                'attack': pa.get('attack', ''),
+                'flag': pa.get('flag', ''),
+                'explanation': pa.get('explanation', '')
+            }
+
+            # ── Lattice Analysis ─────────────────────────────────────────────
+            la = result.get('lattice_analysis') or {}
+            lattice_info = {
+                'status': la.get('status', ''),
+                'cipher': la.get('cipher', ''),
+                'attack': la.get('attack', ''),
+                'flag': la.get('flag', ''),
+                'density': la.get('density', 0),
+                'explanation': la.get('explanation', '')
+            }
+
+            # ── Stego Analysis ───────────────────────────────────────────────
+            sta = result.get('stego_analysis') or {}
+            stego_info = {
+                'status': sta.get('status', ''),
+                'attack': sta.get('attack', ''),
+                'flag': sta.get('flag', ''),
+                'findings': sta.get('findings', [])
+            }
+
+            # ── Advanced Mathematical Analysis ───────────────────────────────
+            ma = result.get('math_analysis') or {}
+            math_info = {
+                'status': ma.get('status', ''),
+                'method': ma.get('method', ''),
+                'flag': ma.get('flag', ''),
+                'methods_checked': ma.get('methods_checked', [])
+            }
+
             q.put({
                 'type': 'result',
                 'decoded_result': decoded_result,
@@ -305,7 +347,14 @@ def solve():
                 'classical_info': classical_info,
                 'rsa_info': rsa_info,
                 'ecc_info': ecc_info,
-                'symmetric_info': symmetric_info
+                'symmetric_info': symmetric_info,
+                'prng_info': prng_info,
+                'lattice_info': lattice_info,
+                'stego_info': stego_info,
+                'math_info': math_info,
+                'solution_report': result.get('solution_report', ''),
+                'ranked_hypotheses': result.get('ranked_hypotheses', []),
+                'extracted_parameters': result.get('extracted_parameters', {})
             })
 
             # Save clean final outputs to outputs/
@@ -317,6 +366,8 @@ def solve():
                 if decoded_result:
                     (out_dir / 'result.txt').write_text(str(decoded_result), encoding='utf-8')
                     (out_dir / 'flag.txt').write_text(str(decoded_result), encoding='utf-8')
+                if result.get('solution_report'):
+                    (out_dir / 'solution_report.txt').write_text(str(result['solution_report']), encoding='utf-8')
             except Exception:
                 pass
         except Exception as exc:
@@ -418,6 +469,80 @@ def api_symmetric():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/prng', methods=['POST'])
+def api_prng():
+    """Direct instant PRNG & LFSR Cryptanalysis API endpoint."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '') or request.form.get('text', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide PRNG or LFSR output sequences.'}), 400
+    try:
+        from prng_cryptanalysis import analyze_and_solve_prng
+        res = analyze_and_solve_prng(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/lattice', methods=['POST'])
+def api_lattice():
+    """Direct instant Lattice Cryptanalysis (Subset Sum / Knapsack) API endpoint."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '') or request.form.get('text', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide knapsack weights and target sum.'}), 400
+    try:
+        from lattice_crypto import analyze_and_solve_lattice
+        res = analyze_and_solve_lattice(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/stego', methods=['POST'])
+def api_stego():
+    """Direct instant Steganography analysis API endpoint."""
+    data = request.get_json(silent=True) or {}
+    target_dir = data.get('path', '') or str(app.config['UPLOAD_FOLDER'])
+    try:
+        from crypto_stego import analyze_and_solve_stego
+        res = analyze_and_solve_stego(target_dir)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/socket_probe', methods=['POST'])
+def api_socket_probe():
+    """Probe a remote netcat CTF socket service."""
+    data = request.get_json(silent=True) or {}
+    target = data.get('target', '') or request.form.get('target', '')
+    if not target.strip():
+        return jsonify({'error': 'Please provide host:port or nc command.'}), 400
+    try:
+        from remote_socket_bridge import parse_nc_command, probe_remote_service
+        host, port = parse_nc_command(target)
+        res = probe_remote_service(host, port)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/advanced_math', methods=['POST'])
+def api_advanced_math():
+    """Direct instant Advanced Mathematical Cryptanalysis API endpoint."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('text', '') or request.form.get('text', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide mathematical challenge parameters.'}), 400
+    try:
+        from advanced_math_crypto import analyze_and_solve_advanced_math
+        res = analyze_and_solve_advanced_math(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/models', methods=['GET'])
 def api_models():
     """Returns the currently active model and configured fallback chain."""
@@ -461,6 +586,70 @@ def api_cleanup():
                     except Exception:
                         pass
         return jsonify({'status': 'ok', 'message': 'Unwanted files cleaned up successfully.', 'cleaned': cleaned})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/hash_crack', methods=['POST'])
+def api_hash_crack():
+    """Hash identification, dictionary cracking, and cracking tool command generation."""
+    data = request.get_json(silent=True) or {}
+    hex_hash = data.get('hash', '') or request.form.get('hash', '')
+    if not hex_hash.strip():
+        return jsonify({'error': 'Please provide a hash string.'}), 400
+    try:
+        from hash_cryptanalysis import identify_hash_type, dictionary_attack, generate_cracking_commands
+        candidates = identify_hash_type(hex_hash.strip())
+        crack_result = None
+        if candidates:
+            crack_result = dictionary_attack(hex_hash.strip(), candidates[0]['type'])
+        commands = generate_cracking_commands(hex_hash.strip())
+        return jsonify({
+            'hash': hex_hash.strip(),
+            'candidates': candidates,
+            'crack_result': crack_result,
+            'cracking_commands': commands
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/attack_ranking', methods=['POST'])
+def api_attack_ranking():
+    """Autonomous attack strategy ranking based on probability and cost."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('challenge', '') or request.form.get('challenge', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide challenge text or ciphertext.'}), 400
+    try:
+        from attack_selector import extract_parameters, analyze_ciphertext_characteristics, rank_attack_strategies
+        params = extract_parameters(text)
+        charac = analyze_ciphertext_characteristics(text)
+        ranked = rank_attack_strategies(params, charac, text)
+        return jsonify({
+            'extracted_parameters': params,
+            'characteristics': charac,
+            'ranked_hypotheses': ranked
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/verify', methods=['POST'])
+def api_verify():
+    """Plaintext sanity check and flag extraction endpoint."""
+    data = request.get_json(silent=True) or {}
+    candidate = data.get('text', '') or request.form.get('text', '')
+    if not candidate.strip():
+        return jsonify({'error': 'Please provide text to verify.'}), 400
+    try:
+        from verification_engine import extract_flag, validate_plaintext
+        flag = extract_flag(candidate)
+        val = validate_plaintext(candidate)
+        return jsonify({
+            'extracted_flag': flag,
+            'validation': val
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

@@ -266,14 +266,153 @@ CTF challenges frequently wrap flags in multiple layers of encoding (e.g. `URL �
 
 ---
 
+### F. PRNG & LFSR Cryptanalysis Suite (`prng_cryptanalysis.py`)
+
+Specialized automated cryptanalysis for pseudo-random number generators and linear feedback shift registers commonly deployed in CTF challenges:
+
+#### Attack Matrix & Methods
+
+| Method | Application | Algorithmic Mechanism |
+|---|---|---|
+| **MT19937 State Untwister** | Full 624-word state recovery | Inverts 32-bit bitwise temper operations (`>>11`, `<<7 & 0x9d2c5680`, `<<15 & 0xefc60000`, `>>18`) to recover the exact 624 internal 32-bit state words |
+| **Python `random` Cloner** | Predict all future outputs | Injects reconstructed MT19937 state array into `random.Random().setstate()` to perfectly emulate the remote Python PRNG |
+| **LCG Known Modulus Solver** | Parameter recovery ($a, c$) | Solves multiplier $a = (s_2 - s_1)(s_1 - s_0)^{-1} \pmod m$ and increment $c = s_1 - a \cdot s_0 \pmod m$ |
+| **LCG Unknown Modulus Solver** | Parameter recovery ($m, a, c$) | Forms trajectory determinants $t_n = s_{n+1} - s_n$; computes $u_n = |t_{n+2} t_n - t_{n+1}^2|$ and extracts modulus via multi-sample $\gcd(u_1, u_2, \dots)$ |
+| **Truncated LCG Solver** | Hidden state bits | Formulates hidden lower bits as a bounded lattice problem solved via LLL basis reduction |
+| **Berlekamp-Massey over $\text{GF}(2)$** | Minimal polynomial of LFSR | Determines the shortest LFSR connection polynomial generating observed keystream sequence in $O(L^2)$ operations |
+| **LFSR Keystream Predictor** | Keystream forecasting | Synthesizes future and past keystream bits using the recovered feedback recurrence equation |
+
+---
+
+### G. Lattice Cryptography Suite (`lattice_crypto.py`)
+
+A pure-Python rational lattice mathematics and cryptanalysis engine independent of external C/C++ libraries:
+
+#### Attack Matrix & Methods
+
+| Method | Application | Algorithmic Mechanism |
+|---|---|---|
+| **Exact Rational LLL Reduction** | Basis reduction | Implements Lenstra-Lenstra-Lovász algorithm over $\mathbb{Q}$ using exact `fractions.Fraction` Gram-Schmidt orthogonalization and Lovász condition $(\delta = 0.75)$ |
+| **Clos-Chor-Lemke Knapsack Solver** | Low-density Subset Sum | Embeds knapsack weights $a_i$ and target sum $S$ into an $(n+1) \times (n+1)$ lattice; recovers binary solutions $m \in \{0, 1\}^n$ for density $d < 0.9408$ |
+| **Merkle-Hellman Cryptanalysis** | Public-key knapsack | Decrypts superincreasing sequences disguised by modular multiplier $W$ and modulus $M$ through orthogonal lattice reduction |
+| **Babai's Nearest Plane (CVP)** | Closest Vector Problem | Finds closest lattice point to target non-lattice vector $v$ using Gram-Schmidt basis projection |
+
+---
+
+### H. Crypto-Steganography Suite (`crypto_stego.py`)
+
+Automated digital asset inspection and payload carving for multi-stage cryptographic challenges:
+
+#### Attack Matrix & Methods
+
+| Method | Application | Algorithmic Mechanism |
+|---|---|---|
+| **LSB Bit Plane Extractor** | Concealed binary payloads | Inspects least significant bit (LSB) planes across Red, Green, Blue, and Alpha channels of image assets |
+| **Trailing Payload Carver** | Appended ciphertexts / flags | Detects and extracts payloads concatenated past standard end-of-file markers: PNG `IEND` chunk and JPEG End-of-Image (`\xff\xd9`) |
+| **Embedded Archive Carving** | Polyglot / nested files | Scans binary buffers for ZIP (`PK\x03\x04`), Gzip (`\x1f\x8b`), 7z, and tar headers with automated decompression |
+
+---
+
+### I. Live Network Netcat Socket Bridge (`remote_socket_bridge.py`)
+
+Pure-Python interactive TCP client designed to automate dialogue with remote netcat CTF challenge servers:
+
+- **Configurable Line-Buffering & Timeouts**: Robust `recvuntil(delim)`, `recvline()`, and `sendline(data)` semantics.
+- **SSL / TLS Wrap Support**: Connects to both raw TCP netcat services and encrypted SSL CTF endpoints.
+- **Automated Service Probing**: Interacts with remote banners, parses prompts, and feeds oracle responses into agent solver pipelines.
+- **Remote Oracle Automation**: Drives live remote padding oracle attacks and bit-flipping queries over network sockets.
+
+---
+
+### J. CTF Knowledge Base & RAG Exploit Retrieval (`ctf_knowledge_base.py`)
+
+Curated repository of exploit recipes and cryptanalysis guidance across all cryptographic domains:
+
+- Covers PRNG, LFSR, Lattice Knapsack, RSA, ECC, Symmetric modes, Stream ciphers, and Classical cryptography.
+- **Query-Based Guidance Retrieval**: Dynamically injects targeted exploit templates, mathematical formulas, and trigger patterns into the LLM context during `classify_and_plan`.
+
+---
+
+### K. Advanced Mathematical Cryptanalysis Suite (`advanced_math_crypto.py`)
+
+Comprehensive computational algebra, lattice reduction, and constraint-solving engine covering 18 advanced mathematical disciplines:
+
+| # | Discipline | Mathematical Formulation & Algorithmic Implementation |
+|---|---|---|
+| 1 | **Lattice-based Cryptanalysis** | Shortest Vector Problem (SVP), Closest Vector Problem (CVP via Babai's Nearest Plane), Knapsack / Subset Sum (Clos-Chor-Lemke), Coppersmith small roots |
+| 2 | **LLL Lattice Reduction** | Exact rational Lenstra–Lenstra–Lovász basis reduction over $\mathbb{Q}$ with Lovász condition $\delta = 0.75$ and Gram-Schmidt orthogonalization |
+| 3 | **BKZ Lattice Reduction** | Block Korkine-Zolotarev reduction: sweeps over local projected blocks of size $\beta \le \text{block\_size}$, finds shortest vector, and re-reduces with LLL |
+| 4 | **Polynomial Factorization** | Over $\mathbb{F}_p$ / $\mathbb{Z}_p$: Cantor-Zassenhaus algorithm splitting factors via $(x+a)^{(p-1)/2} - 1$, distinct-degree factorization |
+| 5 | **Gröbner Basis Methods** | Buchberger's algorithm computing Gröbner basis $G$ of multivariate polynomial ideals with multivariate polynomial division and S-polynomial reduction |
+| 6 | **Modular Arithmetic** | Extended Euclidean Algorithm (XGCD), modular inverse, Jacobi and Legendre symbols, Tonelli-Shanks quadratic residue square root solver |
+| 7 | **Finite Field Arithmetic** | Field operations in $\mathbb{F}_p$ and binary extension fields $\mathbb{F}_{2^m}$ with irreducible polynomial reduction (e.g. AES $\text{GF}(2^8)$, GCM $\text{GF}(2^{128})$) |
+| 8 | **Discrete Logarithm Algorithms** | Baby-Step Giant-Step in $O(\sqrt{N})$, Pollard's Rho discrete log cycle detection, Pohlig-Hellman algorithm for smooth group orders |
+| 9 | **Integer Factorization Algorithms** | Trial division, Fermat's difference of squares, Pollard's $p-1$ (smooth factors), Brent's cycle-finding variant of Pollard's Rho |
+| 10 | **Constraint Solving using Z3** | Transparent Z3 solver wrapper (BitVec, Int, Bool, constraints, satisfiability check, model extraction) with graceful fallback |
+| 11 | **SAT / SMT Solving** | Pure-Python DPLL SAT solver with Unit Propagation and Pure Literal Elimination for cryptanalytic Boolean constraints |
+| 12 | **Chinese Remainder Theorem** | Standard pairwise coprime CRT and Generalized Non-Coprime CRT handling $\gcd(m_i, m_j) > 1$ with consistency validation |
+| 13 | **Gaussian Elimination** | Bit-vector XOR row reduction over $\mathbb{F}_2$, linear system solver over $\mathbb{F}_p$, and exact rational solver over $\mathbb{Q}$ |
+| 14 | **Hensel Lifting** | $p$-adic root lifting: lifts simple modular roots $f(r_0) \equiv 0 \pmod p$ to $r_k \equiv r_{k-1} - f(r_{k-1}) [f'(r_0)]^{-1} \pmod{p^k}$ |
+| 15 | **Berlekamp–Massey Algorithm** | Generalized Berlekamp–Massey algorithm computing the minimal connection polynomial over arbitrary finite fields $\mathbb{F}_p$ |
+| 16 | **LFSR Analysis** | Connection polynomial recovery, state evolution, cycle period computation, and keystream bit synthesis |
+| 17 | **PRNG State Recovery** | LCG multiplier $a$ and increment $c$ recovery (known $m$), unknown modulus $m$ deduction via determinant GCDs, truncated LCG |
+| 18 | **Mersenne Twister State Reconstruction** | MT19937 32-bit and 64-bit untempering, full 624-word state recovery from observed outputs, and standard Python `random.Random` cloning |
+
+---
+
+### L. Hash Cryptanalysis Suite (`hash_cryptanalysis.py`)
+
+Automated hash identification, wordlist recovery, and collision cryptanalysis:
+
+- **Hash Type Identification**: Distinguishes MD5 (32 hex), SHA-1 (40 hex), SHA-224 (56 hex), SHA-256 (64 hex), SHA-384 (96 hex), SHA-512 (128 hex), SHA-3 variants, and NTLM hashes.
+- **Dictionary & Wordlist Cracking**: Fast in-memory wordlist and CTF-keyword matching with salt support.
+- **Length Extension Attack (Merkle-Damgård)**: Automatically computes correct padding ($\text{data} \parallel \text{0x80} \parallel \text{0x00}^* \parallel \text{bit\_length}$) and forges authenticated messages for MD5, SHA-1, SHA-256, and SHA-512 without secret knowledge.
+- **Birthday Collision Analysis**: Demonstrates truncated hash collisions in $O(2^{n/2})$ complexity using cycle-finding techniques.
+- **External Cracker Integration**: Generates ready-to-run Hashcat (`hashcat -m <mode> -a 0 ...`) and John the Ripper (`john --format=<format> ...`) commands with accurate mode mappings.
+
+---
+
+### M. Autonomous Attack Strategy Selector (`attack_selector.py`)
+
+Intelligent parameter extraction and heuristic attack hypothesis prioritization:
+
+- **Autonomous Parameter Extraction**: Scans challenge text, scripts, and logs to extract mathematical parameters ($N, e, c, p, q, \phi, d, G_x, G_y, Q_x, Q_y, r, s, z, \text{IV}, \text{nonce}, \text{tag}$) with bit-length profiling.
+- **Ciphertext Characterization**: Calculates Shannon entropy ($H = -\sum p_i \log_2 p_i$), printable character density, hex and base-encoding indicators to characterize ciphertext randomness.
+- **Attack Hypothesis Ranking**: Evaluates candidates based on probability and computational cost ($O(1), O(\text{poly}), O(\text{subexp}), O(\text{exp})$), automatically prioritizing low-cost, high-probability vectors.
+
+---
+
+### N. Plaintext & Flag Verification Engine (`verification_engine.py`)
+
+Multi-criteria sanity checking, flag extraction, and 10-point solution report generation:
+
+- **Configurable CTF Flag Regexes**: Supports standard and custom formats (`flag{...}`, `CTF{...}`, `picoCTF{...}`, `HTB{...}`, `THM{...}`).
+- **Plaintext Sanity Validation**: Verifies printable ASCII ratios ($\ge 85\%$), reasonable Shannon entropy ($3.0 \le H \le 5.2$), vowel/consonant linguistic ratios, and English quadgram scores.
+- **Mathematical Round-Trip Verification**: Validates RSA round-trip consistency ($c \equiv m^e \pmod N \iff m \equiv c^d \pmod N$) and ECC public key scalar multiplication ($Q = d \cdot P$).
+- **10-Point CTF Solution Report**: Synthesizes a comprehensive writeup covering:
+  1. Challenge Name
+  2. Cryptographic Category
+  3. Identified Vulnerability
+  4. Extracted Mathematical Parameters
+  5. Mathematical Vulnerability Model
+  6. Attack Strategy & Algorithmic Complexity
+  7. Standalone Python / SageMath Exploit Script
+  8. Verified Plaintext / Recovered Flag
+  9. Verification Proof
+  10. Lessons Learned & Remediation
+
+---
+
 ### 🌐 Web Dashboard & REST APIs (`app.py`)
 
 The application features a modern Cyber/Glassmorphism web dashboard on `http://localhost:5000` with real-time SSE streaming logs:
 
 - **12 Guided Category Selectors**: `Auto`, `RSA`, `Classical`, `XOR`, `AES`, `ECC`, `Lattice`, `PRNG`, `Hash`, `Encoding`, `Binary`, `Custom`
 - **Multi-File & Multi-Format Upload Section**: Drag-and-drop or select multiple files simultaneously across diverse formats (Python/Sage scripts, PEM/DER keys, encrypted binaries, images/stego, packet captures, structured data) with format badges and individual file removal
-- **53+ Interactive Attack Strategy Chips**: Guide the agent or test specific vulnerabilities directly across Symmetric, ECC, RSA, Classical, Block ciphers, and XOR
+- **85+ Interactive Attack Strategy Chips**: Guide the agent or test specific vulnerabilities directly across 18 Math Disciplines, Hash Cryptanalysis, PRNG, Lattice, Stego, Netcat, Symmetric, ECC, RSA, Classical, Block ciphers, and XOR
+- **Remote Netcat Socket Input**: Connect directly to remote CTF servers (`nc host port`)
 - **Decoded Output Viewer**: Clean output panel with copy functionality for any plaintext, key, or flag format
+- **10-Point Solution Report Panel**: Instant CTF solution report viewer with markdown rendering and one-click clipboard copying
 - **Candidate Permutations Panel**: Visualizes all classical cipher decryptions ranked by English quadgram scoring
 - **Multi-Layer Encoding & Hash Inspection Card**: Displays recursive peeling layers and hash identification candidates
 
@@ -281,13 +420,21 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 
 | Endpoint | Method | Payload / Parameters | Description |
 |---|---|---|---|
+| `/api/advanced_math` | `POST` | `{"text": "weights=... or x = a (mod m) ..."}` | Direct instant Advanced Mathematical cryptanalysis (18 disciplines: LLL, BKZ, CRT, Hensel, Gröbner, Tonelli-Shanks, SAT) |
+| `/api/hash_crack` | `POST` | `{"hash": "5d41402abc4b2a76b9719d911017c592"}` | Instant hash identification, embedded dictionary cracking, and Hashcat/John command generation |
+| `/api/attack_ranking` | `POST` | `{"challenge": "N = ... e = 3 c = ..."}` | Parameter extraction, Shannon entropy profiling, and prioritized attack ranking |
+| `/api/verify` | `POST` | `{"text": "flag{...}"}` | Plaintext sanity validation (entropy, printable ratio) and configurable CTF flag extraction |
 | `/api/symmetric` | `POST` | `{"text": "cipher=... mode=... ct=..."}` | Direct instant parameter parsing & Symmetric attack execution (10 methods, 6 ciphers) |
-| `/api/ecc` | `POST` | `{"text": "p=... a=... b=..."}` | Direct instant parameter parsing & ECC attack execution (10 methods + LLL HNP) |
-| `/api/rsa` | `POST` | `{"text": "N=... e=... c=..."}` | Direct instant parameter parsing & RSA attack execution (15 methods + LLL) |
+| `/api/ecc` | `POST` | `{"text": "p=... a=... b=..."}` | Direct instant parameter parsing & ECC attack execution (10 methods + LLL HNP + Curve25519/Ed25519) |
+| `/api/rsa` | `POST` | `{"text": "N=... e=... c=..."}` | Direct instant parameter parsing & RSA attack execution (15 methods + LLL + Parity Oracle + Bleichenbacher) |
 | `/api/classical` | `POST` | `{"text": "..."}` | Direct instant analysis & decryption of classical ciphers (18 methods) |
+| `/api/prng` | `POST` | `{"text": "outputs=[...] m=..."}` | Direct instant PRNG state untwisting (MT19937), LCG solving, and LFSR Berlekamp-Massey |
+| `/api/lattice` | `POST` | `{"text": "weights=[...] target=..."}` | Direct instant low-density knapsack / subset-sum solving via rational LLL reduction |
+| `/api/stego` | `POST` | `{"path": "inputs/..."}` | Direct instant LSB plane extraction and trailing EOF payload carving |
+| `/api/socket_probe` | `POST` | `{"target": "host:port"}` | Interactive probe of remote CTF TCP / Netcat socket service |
 | `/api/models` | `GET` | — | Returns active model, fallback models chain, and key rotation status |
 | `/api/cleanup` | `POST` | — | Purges unwanted temporary files from `inputs/` and `outputs/` directories |
-| `/solve` | `POST` | `FormData(challenge, category, attack, challenge_files, csrf_token)` | Dispatches challenge & uploaded files to autonomous LangGraph agent |
+| `/solve` | `POST` | `FormData(challenge, category, attack, nc_target, challenge_files, csrf_token)` | Dispatches challenge, socket target & files to autonomous agent |
 | `/stream/<job_id>` | `GET` | — | Server-Sent Events (SSE) live stream of logs and execution results |
 
 #### 🛡️ 16-Point File Upload Security Architecture (`upload_security.py`)
@@ -366,6 +513,12 @@ crypto-ctf-agent/
 ├── symmetric_cryptanalysis.py # Symmetric cryptanalysis suite (10 attacks, 6 ciphers)
 ├── classical_crypto.py   # Classical cryptanalysis suite (18 methods & solvers)
 ├── rsa_cryptanalysis.py  # RSA cryptanalysis suite (15 attacks & LLL lattice)
+├── prng_cryptanalysis.py # PRNG & LFSR cryptanalysis (MT19937, LCG, LFSR Berlekamp-Massey)
+├── lattice_crypto.py     # Rational LLL lattice reduction, Clos-Chor-Lemke knapsack & CVP
+├── crypto_stego.py       # LSB plane extraction, trailing data & embedded archive carving
+├── remote_socket_bridge.py # Live Netcat TCP socket client & oracle automation
+├── ctf_knowledge_base.py # Curated exploit recipes & dynamic RAG guidance retrieval
+├── advanced_math_crypto.py # Advanced mathematical cryptanalysis (18 disciplines: LLL, BKZ, CRT, Gröbner, Hensel, SAT)
 ├── hash_decoder.py       # Multi-layer hash & encoding auto-detector
 ├── app.py                # Web dashboard & real-time SSE streaming solver
 ├── upload_security.py    # 16-point defense-in-depth file upload security manager

@@ -931,7 +931,8 @@ textarea:focus{
 
 <!-- ── Stats Strip ────────────────────────────────────────────────────────── -->
 <div class="stats-strip">
-  <div class="stat"><div class="stat-num">53+</div><div class="stat-label">Attack Types</div></div>
+  <div class="stat"><div class="stat-num">75+</div><div class="stat-label">Attack Types</div></div>
+  <div class="stat"><div class="stat-num">18</div><div class="stat-label">Math Disciplines</div></div>
   <div class="stat"><div class="stat-num">10</div><div class="stat-label">Symmetric Attacks</div></div>
   <div class="stat"><div class="stat-num">10</div><div class="stat-label">ECC Attacks</div></div>
   <div class="stat"><div class="stat-num">15</div><div class="stat-label">RSA Attacks</div></div>
@@ -962,6 +963,11 @@ textarea:focus{
           <textarea id="challenge-text"
             placeholder="RSA Challenge:&#10;N = 182198...&#10;e = 657351...&#10;c = 920471...&#10;&#10;Recover the hidden flag."></textarea>
           <span class="char-count" id="char-count">0 chars</span>
+        </div>
+
+        <label class="field-label" style="margin-top:18px;">Remote Netcat Socket <span style="color:var(--text-3);font-weight:400;text-transform:none;font-size:11px;">(Optional CTF server: nc host port)</span></label>
+        <div class="field-wrap">
+          <input type="text" id="nc-target" placeholder="e.g. nc chall.ctf.org 1337 or chall.ctf.org:1337" style="width:100%;background:var(--ink-2);border:1px solid rgba(148,163,184,.12);border-radius:var(--radius-sm);color:var(--text-1);font-family:'JetBrains Mono',monospace;font-size:13px;padding:9px 12px;outline:none;" />
         </div>
 
         <label class="field-label" style="margin-top:18px;">Attach Files <span style="color:var(--text-3);font-weight:400;text-transform:none;font-size:11px;">(Supports multiple files &amp; multi-format: code, keys, ciphertexts, images)</span></label>
@@ -1045,6 +1051,9 @@ textarea:focus{
           <div class="att-chip" data-val="Partial Key Exposure">🧩 Partial Key Bits</div>
           <div class="att-chip" data-val="Bellcore CRT Fault Attack">⚡ CRT Fault Attack</div>
           <div class="att-chip" data-val="Integer Factorization">🔍 Factoring Recovery</div>
+          <div class="att-chip" data-val="RSA Parity Oracle">⚖️ RSA Parity Oracle</div>
+          <div class="att-chip" data-val="Bleichenbacher Padding Oracle">📦 Bleichenbacher PKCS#1 v1.5</div>
+          <div class="att-chip" data-val="Weak Prime Detection">🔍 Weak Prime Detection (ROCA/Close)</div>
 
           <div class="att-section-label">Classical Cryptanalysis (18 Methods)</div>
           <div class="att-chip" data-val="Caesar Cipher Brute Force">🏛️ Caesar Brute Force</div>
@@ -1080,6 +1089,15 @@ textarea:focus{
           <div class="att-chip" data-val="Nonce Reuse Attack">🔁 Nonce Reuse (ECDSA)</div>
           <div class="att-chip" data-val="Biased Nonce Attack">⚖️ Biased Nonce (HNP via LLL)</div>
           <div class="att-chip" data-val="LLL-based ECDSA Attack">🕸️ LLL-based ECDSA Attack</div>
+          <div class="att-chip" data-val="Curve25519 Montgomery Ladder">🧗 Curve25519 Montgomery Ladder</div>
+          <div class="att-chip" data-val="Ed25519 Twisted Edwards Point Ops">⚡ Ed25519 Twisted Edwards</div>
+
+          <div class="att-section-label">Hash Cryptanalysis &amp; Cracking</div>
+          <div class="att-chip" data-val="Hash Type Identification">🔑 Hash Type Identification</div>
+          <div class="att-chip" data-val="Wordlist Dictionary Attack">📖 Dictionary / Wordlist Attack</div>
+          <div class="att-chip" data-val="Length Extension Attack">🔗 Length Extension (Merkle-Damgård)</div>
+          <div class="att-chip" data-val="Birthday Collision Demo">🎂 Birthday Collision Analysis</div>
+          <div class="att-chip" data-val="Hashcat / John Command Generation">💻 Hashcat / John Command Gen</div>
 
           <div class="att-section-label">Symmetric Cryptography (10 Attacks &amp; Block/Stream)</div>
           <div class="att-chip" data-val="ECB Byte-at-a-Time Attack">🧱 ECB Byte-at-a-Time</div>
@@ -1106,6 +1124,33 @@ textarea:focus{
           <div class="att-chip" data-val="Gzip / Zlib Decompression">🗜️ Gzip / Zlib Decompression</div>
           <div class="att-chip" data-val="Morse Code Decode">📡 Morse Code Decode</div>
           <div class="att-chip" data-val="Hash Identification">🔑 Hash Identification (MD5/SHA/NTLM)</div>
+
+          <div class="att-section-label">PRNG &amp; LFSR Cryptanalysis (Untwister &amp; Solvers)</div>
+          <div class="att-chip" data-val="MT19937 State Recovery">🎲 MT19937 Untwister (Python random)</div>
+          <div class="att-chip" data-val="LCG Parameter Recovery">📈 LCG Modulus &amp; Multiplier Solver</div>
+          <div class="att-chip" data-val="LFSR Berlekamp-Massey">🔀 LFSR Berlekamp-Massey GF(2)</div>
+
+          <div class="att-section-label">Lattice Cryptography &amp; Knapsack</div>
+          <div class="att-chip" data-val="Subset-Sum Clos-Chor-Lemke">🕸️ Clos-Chor-Lemke Subset Sum (LLL)</div>
+          <div class="att-chip" data-val="Merkle-Hellman Knapsack">🎒 Merkle-Hellman Cryptanalysis</div>
+          <div class="att-chip" data-val="Babai Nearest Plane CVP">🎯 Babai's Nearest Plane (CVP)</div>
+
+          <div class="att-section-label">Crypto-Steganography &amp; Network Socket</div>
+          <div class="att-chip" data-val="LSB Bit-Plane Steganography">🖼️ LSB Plane Extractor (RGB)</div>
+          <div class="att-chip" data-val="Trailing File Data Carving">✂️ Trailing Data Carving (PNG/JPEG)</div>
+          <div class="att-chip" data-val="Remote Netcat Socket Oracle">🌐 Netcat Socket Interactive Probe</div>
+
+          <div class="att-section-label">Advanced Mathematical Cryptanalysis (18 Disciplines)</div>
+          <div class="att-chip" data-val="BKZ Lattice Reduction">🧮 BKZ Block Lattice Reduction</div>
+          <div class="att-chip" data-val="Cantor-Zassenhaus Factorization">🌱 Cantor-Zassenhaus Roots GF(p)</div>
+          <div class="att-chip" data-val="Groebner Basis Buchberger">📐 Buchberger Gröbner Basis</div>
+          <div class="att-chip" data-val="Hensel Root Lifting">🪜 Hensel p-adic Root Lifting</div>
+          <div class="att-chip" data-val="Generalized CRT">♾️ Generalized Non-Coprime CRT</div>
+          <div class="att-chip" data-val="Tonelli-Shanks Modular Sqrt">√x Tonelli-Shanks Square Root</div>
+          <div class="att-chip" data-val="Gaussian Elimination GF(2) and GF(p)">🔢 Gaussian Elimination (GF(2)/GF(p))</div>
+          <div class="att-chip" data-val="SAT/SMT Constraint Solver">🧩 DPLL SAT / SMT Solver</div>
+          <div class="att-chip" data-val="Finite Field GF(2^m) Arithmetic">🛡️ GF(2^m) Field Arithmetic</div>
+          <div class="att-chip" data-val="Pohlig-Hellman Discrete Log">🐾 Pohlig-Hellman Smooth DLog</div>
         </div>
       </div>
     </div>
@@ -1196,6 +1241,14 @@ textarea:focus{
           <button class="code-copy" id="code-copy">Copy code</button>
         </div>
         <pre><code class="language-python" id="exploit-code"></code></pre>
+      </div>
+      <!-- 10-Point CTF Solution Report -->
+      <div class="code-viewer" id="report-viewer" style="display:none;margin-top:16px;">
+        <div class="code-topbar">
+          <span class="code-lang">📋 10-Point CTF Solution Report</span>
+          <button class="code-copy" id="report-copy">Copy Report</button>
+        </div>
+        <pre><code class="language-markdown" id="report-text" style="white-space:pre-wrap;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-1);"></code></pre>
       </div>
     </div>
 
@@ -1361,6 +1414,130 @@ textarea:focus{
         <span class="catalog-tag">Hex &amp; Binary</span>
         <span class="catalog-tag">Hash ID (MD5/SHA/NTLM)</span>
         <span class="catalog-tag">Recursive Onion Peel</span>
+      </div>
+    </div>
+
+    <!-- PRNG & LFSR Cryptanalysis -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🎲</span> PRNG &amp; LFSR Cryptanalysis</div>
+        <span class="catalog-badge badge-block">Pure Python Solvers</span>
+      </div>
+      <div class="catalog-desc">
+        Mersenne Twister MT19937 state untwister &amp; Python random cloner, LCG modulus/multiplier recovery via determinant GCD, and LFSR Berlekamp-Massey over GF(2).
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">MT19937 State Recovery</span>
+        <span class="catalog-tag">Python random Cloner</span>
+        <span class="catalog-tag">LCG Modulus Determinant</span>
+        <span class="catalog-tag">LCG Multiplier / Increment</span>
+        <span class="catalog-tag">LFSR Berlekamp-Massey</span>
+        <span class="catalog-tag">GF(2) Keystream Predictor</span>
+      </div>
+    </div>
+
+    <!-- Lattice Cryptography & Knapsack -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🕸️</span> Lattice Cryptography</div>
+        <span class="catalog-badge badge-rsa">LLL &amp; Knapsack</span>
+      </div>
+      <div class="catalog-desc">
+        Exact rational Lenstra-Lenstra-Lovász (LLL) basis reduction, Clos-Chor-Lemke low-density subset-sum solver, Merkle-Hellman knapsack cryptosystem attacks, and Babai's Nearest Plane (CVP).
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Exact Rational LLL</span>
+        <span class="catalog-tag">Gram-Schmidt Orthogonalization</span>
+        <span class="catalog-tag">Clos-Chor-Lemke Knapsack</span>
+        <span class="catalog-tag">Merkle-Hellman Trapdoor</span>
+        <span class="catalog-tag">Babai Nearest Plane (CVP)</span>
+        <span class="catalog-tag">Low-Density Subset Sum</span>
+      </div>
+    </div>
+
+    <!-- Steganography & Network Bridge -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🖼️</span> Stego &amp; Netcat Bridge</div>
+        <span class="catalog-badge badge-hash">Carving &amp; Sockets</span>
+      </div>
+      <div class="catalog-desc">
+        RGB channel LSB plane extraction, trailing payload carving past standard EOF markers (PNG IEND, JPEG EOI), embedded archive extraction, and live Netcat TCP socket oracle dialogue.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">RGB LSB Extraction</span>
+        <span class="catalog-tag">PNG IEND Trailing Carving</span>
+        <span class="catalog-tag">JPEG EOI Payload Carving</span>
+        <span class="catalog-tag">Embedded ZIP / Gzip</span>
+        <span class="catalog-tag">Netcat TCP Client</span>
+        <span class="catalog-tag">Remote Padding Oracle</span>
+      </div>
+    </div>
+
+    <!-- Advanced Mathematical Cryptanalysis -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🧮</span> Advanced Mathematical Cryptanalysis</div>
+        <span class="catalog-badge badge-rsa">18 Disciplines</span>
+      </div>
+      <div class="catalog-desc">
+        Comprehensive computational algebra &amp; number theory: LLL/BKZ lattice reduction, Cantor-Zassenhaus polynomial factorization, Buchberger Gröbner bases, Hensel lifting, Generalized non-coprime CRT, Gaussian elimination (GF(2)/GF(p)/Q), Tonelli-Shanks, DPLL SAT &amp; Z3 constraint solving, and finite fields.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">BKZ Reduction</span>
+        <span class="catalog-tag">Buchberger Gröbner</span>
+        <span class="catalog-tag">Cantor-Zassenhaus</span>
+        <span class="catalog-tag">Hensel Lifting</span>
+        <span class="catalog-tag">Generalized CRT</span>
+        <span class="catalog-tag">Gaussian GF(2)/GF(p)</span>
+        <span class="catalog-tag">Tonelli-Shanks</span>
+        <span class="catalog-tag">DPLL SAT Solver</span>
+        <span class="catalog-tag">GF(2^m) Field Math</span>
+        <span class="catalog-tag">Pohlig-Hellman DLog</span>
+        <span class="catalog-tag">Berlekamp-Massey</span>
+        <span class="catalog-tag">MT19937 Reconstruction</span>
+      </div>
+    </div>
+
+    <!-- Hash Cryptanalysis & Cracking -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🔑</span> Hash Cryptanalysis &amp; Cracking</div>
+        <span class="catalog-badge badge-hash">Hashes &amp; Collisions</span>
+      </div>
+      <div class="catalog-desc">
+        Hash type identification (MD5, SHA-1, SHA-224/256/384/512, SHA-3, NTLM), embedded dictionary attack, brute-force generator, Merkle-Damgård length extension attack analysis, birthday collision demonstration, and Hashcat/John command generation.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Hash Identification</span>
+        <span class="catalog-tag">Dictionary Attack</span>
+        <span class="catalog-tag">Length Extension</span>
+        <span class="catalog-tag">Merkle-Damgård Pad</span>
+        <span class="catalog-tag">Birthday Paradox</span>
+        <span class="catalog-tag">Collision Analysis</span>
+        <span class="catalog-tag">Hashcat Integration</span>
+        <span class="catalog-tag">John the Ripper</span>
+      </div>
+    </div>
+
+    <!-- Autonomous Attack Selector & Verification Engine -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🎯</span> Autonomous Selector &amp; Verification</div>
+        <span class="catalog-badge badge-ecc">Strategy &amp; Verification</span>
+      </div>
+      <div class="catalog-desc">
+        Parameter extraction engine (N, e, c, p, q, G, Q, d, iv, nonce), ciphertext characterization (Shannon entropy, character frequency, base patterns), prioritized attack ranking (probability and computational cost), configurable CTF regexes, and 10-point solution report synthesis.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Parameter Extraction</span>
+        <span class="catalog-tag">Shannon Entropy</span>
+        <span class="catalog-tag">Hypothesis Ranking</span>
+        <span class="catalog-tag">Cost Estimation</span>
+        <span class="catalog-tag">Configurable Flags</span>
+        <span class="catalog-tag">Plaintext Sanity</span>
+        <span class="catalog-tag">RSA Round-trip</span>
+        <span class="catalog-tag">10-Point Synthesis</span>
       </div>
     </div>
 
@@ -1717,6 +1894,10 @@ btnSubmit.addEventListener('click', async () => {
   fd.append('challenge', text);
   fd.append('category', selectedCategory());
   fd.append('attack', selectedAttack());
+  const ncVal = document.getElementById('nc-target')?.value?.trim();
+  if (ncVal) {
+    fd.append('nc_target', ncVal);
+  }
   uploadedFiles.forEach(f => {
     fd.append('challenge_files', f);
   });
@@ -1799,6 +1980,8 @@ btnSubmit.addEventListener('click', async () => {
 document.getElementById('btn-clear-input')?.addEventListener('click', () => {
   ta.value = '';
   cc.textContent = '0 chars';
+  const ncElem = document.getElementById('nc-target');
+  if (ncElem) ncElem.value = '';
   uploadedFiles = [];
   renderFileList();
   if (fileInput) fileInput.value = '';
@@ -1827,6 +2010,8 @@ document.getElementById('btn-clear-output')?.addEventListener('click', () => {
   }
   const hashCard = document.getElementById('hash-card');
   if (hashCard) hashCard.style.display = 'none';
+  const reportViewer = document.getElementById('report-viewer');
+  if (reportViewer) reportViewer.style.display = 'none';
   ['s-classify','s-generate','s-execute','s-result'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.classList.remove('active','done');
@@ -1944,6 +2129,24 @@ function showResult(msg) {
     codeViewer.style.display = 'none';
   }
 
+  // ── 10-Point CTF Solution Report ─────────────────────────────────────────
+  const reportViewer = document.getElementById('report-viewer');
+  const reportText = document.getElementById('report-text');
+  if (reportViewer && reportText && msg.solution_report && msg.solution_report.trim()) {
+    reportText.textContent = msg.solution_report;
+    reportViewer.style.display = 'block';
+    const repCopyBtn = document.getElementById('report-copy');
+    if (repCopyBtn) {
+      repCopyBtn.onclick = () => {
+        navigator.clipboard.writeText(msg.solution_report);
+        repCopyBtn.textContent = 'Copied!';
+        setTimeout(() => repCopyBtn.textContent = 'Copy Report', 1800);
+      };
+    }
+  } else if (reportViewer) {
+    reportViewer.style.display = 'none';
+  }
+
   // ── Hash / Encoding Analysis Card ───────────────────────────────────────
   if (msg.hash_info) showHashCard(msg.hash_info);
 }
@@ -1963,6 +2166,8 @@ function showFailed(msg) {
   if (allResultsWrap) { allResultsWrap.style.display = 'none'; allResultsWrap.innerHTML = ''; }
   const codeViewer = document.getElementById('code-viewer');
   if (codeViewer) codeViewer.style.display = 'none';
+  const reportViewer = document.getElementById('report-viewer');
+  if (reportViewer) reportViewer.style.display = 'none';
 }
 
 /* ── Hash / Encoding Analysis Card renderer ───────────────────────────────── */

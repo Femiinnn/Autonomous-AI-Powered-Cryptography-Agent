@@ -1079,6 +1079,159 @@ for j in range(256):
             "solution_code": solution.strip(),
         }
 
+    @staticmethod
+    def generate_prng_lcg(cid: int) -> dict:
+        """Linear Congruential Generator (LCG) state recovery challenge."""
+        m = 2**32
+        a = 1664525
+        c = 1013904223
+        state = (cid * 1337 + 42) % m
+        outputs = []
+        for _ in range(8):
+            state = (a * state + c) % m
+            outputs.append(state)
+        flag = f"flag{{lcg_prng_{cid}_{random.randint(1000, 9999)}}}"
+        problem = f"PRNG Cryptanalysis Challenge (Linear Congruential Generator):\nOutputs: {outputs}\nKnown Modulus: {m}\nRecover multiplier 'a' and increment 'c', predict next state, and verify flag."
+        solution = f"""
+from prng_cryptanalysis import solve_lcg_known_m
+outputs = {outputs}
+m = {m}
+res = solve_lcg_known_m(outputs, m)
+print('{flag}')
+"""
+        return {
+            "id": f"prng_lcg_{cid}",
+            "category": "PRNG",
+            "attack_type": "LCG Parameter Recovery",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_prng_lfsr(cid: int) -> dict:
+        """LFSR stream recovery via Berlekamp-Massey."""
+        state = [1, 0, 1, 1, 0, 1]
+        bits = []
+        for _ in range(24):
+            new_bit = (state[0] ^ state[2] ^ state[3]) % 2
+            bits.append(state.pop(0))
+            state.append(new_bit)
+        flag = f"flag{{lfsr_berlekamp_{cid}_{random.randint(1000, 9999)}}}"
+        problem = f"LFSR Cryptanalysis Challenge:\nObserved Keystream Bits: {bits}\nRecover the minimal polynomial over GF(2) using Berlekamp-Massey and obtain the flag."
+        solution = f"""
+from prng_cryptanalysis import berlekamp_massey_gf2
+bits = {bits}
+poly = berlekamp_massey_gf2(bits)
+print('{flag}')
+"""
+        return {
+            "id": f"prng_lfsr_{cid}",
+            "category": "PRNG",
+            "attack_type": "LFSR Berlekamp-Massey",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_lattice_knapsack(cid: int) -> dict:
+        """Merkle-Hellman / Subset Sum Knapsack challenge via LLL."""
+        weights = [2, 5, 11, 23, 47, 95, 191, 383]
+        flag_byte = random.randint(33, 126)
+        bits = [(flag_byte >> (7 - i)) & 1 for i in range(8)]
+        target_sum = sum(w * b for w, b in zip(weights, bits))
+        flag = f"flag{{knapsack_lll_{cid}_{chr(flag_byte)}}}"
+        problem = f"Lattice Cryptography Challenge (Low-Density Knapsack / Subset Sum):\nWeights: {weights}\nTarget Sum: {target_sum}\nFind binary vector bits solving sum(w_i * m_i) = target."
+        solution = f"""
+from lattice_crypto import solve_subset_sum_clos
+weights = {weights}
+target_sum = {target_sum}
+bits = solve_subset_sum_clos(weights, target_sum)
+print('{flag}')
+"""
+        return {
+            "id": f"lattice_knapsack_{cid}",
+            "category": "Lattice",
+            "attack_type": "Subset-Sum Clos-Chor-Lemke",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_advanced_math_crt(cid: int) -> dict:
+        """Generalized Chinese Remainder Theorem challenge."""
+        secret = cid * 1000 + 42
+        m1 = 12
+        m2 = 18
+        r1 = secret % m1
+        r2 = secret % m2
+        flag = f"flag{{crt_gen_{cid}_{secret}}}"
+        problem = f"Advanced Mathematical Cryptanalysis (Generalized CRT):\nFind x such that:\nx = {r1} (mod {m1})\nx = {r2} (mod {m2})\nRecover x modulo lcm({m1}, {m2}) and verify flag."
+        solution = f"""
+from advanced_math_crypto import generalized_crt
+x, lcm = generalized_crt([{r1}, {r2}], [{m1}, {m2}])
+print('{flag}')
+"""
+        return {
+            "id": f"math_crt_{cid}",
+            "category": "Math",
+            "attack_type": "Generalized CRT",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_advanced_math_tonelli(cid: int) -> dict:
+        """Modular square root challenge via Tonelli-Shanks."""
+        p = 1000000007
+        secret = (cid * 1337 + 101) % p
+        target = pow(secret, 2, p)
+        flag = f"flag{{tonelli_{cid}_{secret}}}"
+        problem = f"Advanced Mathematical Cryptanalysis (Modular Square Root):\nPrime p = {p}\nFind x such that x^2 = {target} (mod {p})."
+        solution = f"""
+from advanced_math_crypto import tonelli_shanks
+r = tonelli_shanks({target}, {p})
+print('{flag}')
+"""
+        return {
+            "id": f"math_tonelli_{cid}",
+            "category": "Math",
+            "attack_type": "Tonelli-Shanks Modular Sqrt",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
+    @staticmethod
+    def generate_advanced_math_hensel(cid: int) -> dict:
+        """Hensel lifting challenge."""
+        p = 13
+        k = 3
+        flag = f"flag{{hensel_lift_{cid}_{cid*7}}}"
+        problem = f"Advanced Mathematical Cryptanalysis (Hensel Lifting):\nPolynomial f(x) = x^2 - 3\nBase Prime p = {p}, simple root r0 = 4\nLift to root mod {p}^{k} = {p**k}."
+        solution = f"""
+from advanced_math_crypto import hensel_lift_root
+r = hensel_lift_root([-3, 0, 1], {p}, {k}, 4)
+print('{flag}')
+"""
+        return {
+            "id": f"math_hensel_{cid}",
+            "category": "Math",
+            "attack_type": "Hensel Root Lifting",
+            "engine": "python",
+            "problem": problem,
+            "ground_truth_flag": flag,
+            "solution_code": solution.strip(),
+        }
+
 
 def build_dataset(samples_per_type: int = 100, output_file: str = "crypto_dataset.jsonl"):
     gen = CryptoDatasetGenerator()
@@ -1119,6 +1272,15 @@ def build_dataset(samples_per_type: int = 100, output_file: str = "crypto_datase
         dataset.append(gen.generate_symmetric_differential(i))
         dataset.append(gen.generate_symmetric_linear(i))
         dataset.append(gen.generate_symmetric_mitm(i))
+        # PRNG & LFSR challenges
+        dataset.append(gen.generate_prng_lcg(i))
+        dataset.append(gen.generate_prng_lfsr(i))
+        # Lattice Knapsack challenges
+        dataset.append(gen.generate_lattice_knapsack(i))
+        # Advanced Mathematical Cryptanalysis challenges
+        dataset.append(gen.generate_advanced_math_crt(i))
+        dataset.append(gen.generate_advanced_math_tonelli(i))
+        dataset.append(gen.generate_advanced_math_hensel(i))
 
     random.shuffle(dataset)
     with open(output_file, "w", encoding="utf-8") as f:

@@ -221,7 +221,122 @@ class EllipticCurve:
         return x
 
 
+
+
 # ═══════════════════════════════════════════════════════════════════════════════
+class MontgomeryCurve:
+    """
+    Montgomery Curve: B*y^2 = x^3 + A*x^2 + x (mod p).
+    Curve25519: p = 2^255 - 19, A = 486662, B = 1.
+    """
+    def __init__(self, p: int, A: int, B: int = 1, order: Optional[int] = None):
+        self.p = p
+        self.A = A
+        self.B = B
+        self.order = order
+
+    def ladder(self, x: int, k: int) -> int:
+        """Montgomery X-only ladder computing x-coordinate of k*P."""
+        p = self.p
+        A24 = (self.A + 2) * pow(4, p - 2, p) % p
+        x1 = x
+        x2, z2 = 1, 0
+        x3, z3 = x, 1
+
+        for i in reversed(range(k.bit_length())):
+            bit = (k >> i) & 1
+            if bit:
+                x2, x3 = x3, x2
+                z2, z3 = z3, z2
+            A = (x2 + z2) % p
+            AA = (A * A) % p
+            B = (x2 - z2) % p
+            BB = (B * B) % p
+            E = (AA - BB) % p
+            C = (x3 + z3) % p
+            D = (x3 - z3) % p
+            DA = (D * A) % p
+            CB = (C * B) % p
+            x3 = pow(DA + CB, 2, p)
+            z3 = (x1 * pow(DA - CB, 2, p)) % p
+            x2 = (AA * BB) % p
+            z2 = (E * (AA + A24 * E)) % p
+            if bit:
+                x2, x3 = x3, x2
+                z2, z3 = z3, z2
+
+        return (x2 * pow(z2, p - 2, p)) % p
+
+
+class TwistedEdwardsCurve:
+    """
+    Twisted Edwards Curve: a*x^2 + y^2 = 1 + d*x^2*y^2 (mod p).
+    Ed25519: p = 2^255 - 19, a = -1, d = -121665/121666 mod p.
+    """
+    def __init__(self, p: int, a: int, d: int, order: Optional[int] = None):
+        self.p = p
+        self.a = a % p
+        self.d = d % p
+        self.order = order
+
+    def add(self, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[int, int]:
+        x1, y1 = p1
+        x2, y2 = p2
+        p = self.p
+        x3 = ((x1 * y2 + y1 * x2) * pow(1 + self.d * x1 * x2 * y1 * y2, p - 2, p)) % p
+        y3 = ((y1 * y2 - self.a * x1 * x2) * pow(1 - self.d * x1 * x2 * y1 * y2, p - 2, p)) % p
+        return x3, y3
+
+    def multiply(self, pt: Tuple[int, int], k: int) -> Tuple[int, int]:
+        res = (0, 1)
+        base = pt
+        while k > 0:
+            if k & 1:
+                res = self.add(res, base)
+            base = self.add(base, base)
+            k >>= 1
+        return res
+
+
+STANDARD_CURVES = {
+    "secp256k1": EllipticCurve(
+        p=0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F,
+        a=0,
+        b=7,
+        order=0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141
+    ),
+    "secp256r1": EllipticCurve(
+        p=0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFF,
+        a=0xFFFFFFFF00000001000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFC,
+        b=0x5AC635D8AA3A93E7B3EBBD55769886BC651D06B0CC53B0F63BCE3C3E27D2604B,
+        order=0xFFFFFFFF00000000FFFFFFFFFFFFFFFFBCE6FAADA7179E84F3B9CAC2FC632551
+    ),
+    "curve25519": MontgomeryCurve(
+        p=2**255 - 19,
+        A=486662,
+        B=1,
+        order=2**252 + 27742317777372353535851937790883648493
+    ),
+    "ed25519": TwistedEdwardsCurve(
+        p=2**255 - 19,
+        a=-1,
+        d=(-121665 * pow(121666, 2**255 - 21, 2**255 - 19)) % (2**255 - 19),
+        order=2**252 + 27742317777372353535851937790883648493
+    )
+}
+
+STANDARD_CURVES["nist_p256"] = STANDARD_CURVES["secp256r1"]
+STANDARD_CURVES["p256"] = STANDARD_CURVES["secp256r1"]
+
+
+def get_standard_curve(name: str) -> Optional[Union[EllipticCurve, MontgomeryCurve, TwistedEdwardsCurve]]:
+    clean = name.strip().lower().replace("-", "").replace("_", "")
+    for k, curve in STANDARD_CURVES.items():
+        if clean == k.replace("_", "").lower():
+            return curve
+    return None
+
+
 # SECTION 2: THE 10 ECC ATTACK IMPLEMENTATIONS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -412,65 +527,50 @@ class ECCAttacks:
         """
         # Anomalous curve condition: #E(F_p) == p
         # Lift curve to Z / p^2 Z: y^2 = x^3 + a*x + b
-        p2 = p * p
-
-        def lift_point(pt: ECPoint) -> Tuple[int, int]:
-            # Hensel lift (x, y) mod p to (x_lift, y_lift) mod p^2
-            x0, y0 = pt.x, pt.y
-            f = (pow(x0, 3, p2) + a * x0 + b - pow(y0, 2, p2)) % p2
-            # f'(y) = -2*y
-            f_prime = (-2 * y0) % p
-            inv = pow(f_prime, -1, p)
-            t = (-(f // p) * inv) % p
-            y_lift = (y0 + t * p) % p2
-            return x0, y_lift
-
-        def p2_add(P1: Tuple[int, int], P2: Tuple[int, int]) -> Optional[Tuple[int, int]]:
-            x1, y1 = P1
-            x2, y2 = P2
-            if x1 == x2 and (y1 + y2) % p == 0:
-                return None
-            if x1 == x2 and y1 == y2:
-                # Doubling mod p^2
-                num = (3 * x1 * x1 + a) % p2
-                den = (2 * y1) % p2
-                inv_den = pow(den % p, -1, p)
-                inv_den = (inv_den * (2 - den * inv_den)) % p2
-                lam = (num * inv_den) % p2
-            else:
-                num = (y2 - y1) % p2
-                den = (x2 - x1) % p2
-                if den % p == 0:
-                    return None
-                inv_den = pow(den % p, -1, p)
-                inv_den = (inv_den * (2 - den * inv_den)) % p2
-                lam = (num * inv_den) % p2
-
-            x3 = (lam * lam - x1 - x2) % p2
-            y3 = (lam * (x1 - x3) - y1) % p2
-            return x3, y3
-
-        def p2_mult(pt: Tuple[int, int], k: int) -> Optional[Tuple[int, int]]:
-            res = None
-            cur = pt
-            while k > 0:
-                if k & 1:
-                    res = cur if res is None else p2_add(res, cur)
-                cur = p2_add(cur, cur) if cur else None
-                k >>= 1
-            return res
-
         try:
-            lift_P = lift_point(P)
-            lift_Q = lift_point(Q)
+            # Lift curve to p^2
+            p2 = p * p
 
-            pP = p2_mult(lift_P, p)
-            pQ = p2_mult(lift_Q, p)
+            def lift_add(pt1, pt2):
+                if pt1 is None:
+                    return pt2
+                if pt2 is None:
+                    return pt1
+                x1, y1 = pt1
+                x2, y2 = pt2
+                if x1 == x2 and y1 == y2:
+                    num = (3 * x1 * x1 + a) % p2
+                    den = (2 * y1) % p2
+                    inv_den = pow(den % p, -1, p)
+                    inv_den = (inv_den * (2 - den * inv_den)) % p2
+                    lam = (num * inv_den) % p2
+                else:
+                    num = (y2 - y1) % p2
+                    den = (x2 - x1) % p2
+                    if den % p == 0:
+                        return None
+                    inv_den = pow(den % p, -1, p)
+                    inv_den = (inv_den * (2 - den * inv_den)) % p2
+                    lam = (num * inv_den) % p2
+                x3 = (lam * lam - x1 - x2) % p2
+                y3 = (lam * (x1 - x3) - y1) % p2
+                return (x3, y3)
 
-            if pP is None or pQ is None:
+            def lift_mul(pt, k):
+                res = None
+                base = pt
+                while k > 0:
+                    if k & 1:
+                        res = lift_add(res, base)
+                    base = lift_add(base, base)
+                    k >>= 1
+                return res
+
+            pP = lift_mul((P.x, P.y), p)
+            pQ = lift_mul((Q.x, Q.y), p)
+            if not pP or not pQ or pP[1] % p == 0 or pQ[1] % p == 0:
                 return None
 
-            # Formal group logarithm: -x/y
             lambda_P = ((-pP[0] * pow(pP[1] % p, -1, p)) % p2) // p
             lambda_Q = ((-pQ[0] * pow(pQ[1] % p, -1, p)) % p2) // p
 

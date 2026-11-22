@@ -48,6 +48,13 @@ class CryptoAgentState(TypedDict):
     rsa_analysis: Optional[dict]        # full report from rsa_cryptanalysis
     ecc_analysis: Optional[dict]        # full report from ecc_cryptanalysis
     symmetric_analysis: Optional[dict]  # full report from symmetric_cryptanalysis
+    prng_analysis: Optional[dict]       # full report from prng_cryptanalysis
+    lattice_analysis: Optional[dict]    # full report from lattice_crypto
+    stego_analysis: Optional[dict]      # full report from crypto_stego
+    math_analysis: Optional[dict]       # full report from advanced_math_crypto
+    extracted_parameters: Optional[dict] # autonomous parameter extraction
+    ranked_hypotheses: Optional[list]    # prioritized attack vectors
+    solution_report: Optional[str]       # 10-point CTF solution report
     job_id: Optional[str]              # Isolated job ID for sandboxed challenge files
 
 
@@ -73,6 +80,25 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
         re.search(r'\b(N\s*=|modulus|e\s*=|c\s*=|d\s*=|p\s*=|q\s*=|phi\s*=)\b', challenge, re.IGNORECASE)
         and re.search(r'\d{10,}', challenge)
     )
+
+    verified_flag = None
+    solved_category = "Classical Cryptography"
+    solved_attack = "Direct Cryptanalysis"
+    solved_code = ""
+
+    # 0. Autonomous Parameter Extraction & Attack Strategy Ranking
+    extracted_params = {}
+    ranked_hypotheses = []
+    try:
+        from attack_selector import extract_parameters, analyze_ciphertext_characteristics, rank_attack_strategies
+        extracted_params = extract_parameters(challenge)
+        charac = analyze_ciphertext_characteristics(challenge)
+        ranked_hypotheses = rank_attack_strategies(extracted_params, charac, challenge)
+        if ranked_hypotheses:
+            top_h = ranked_hypotheses[0]
+            print(f"  🎯 Ranked Attack Vector #1: {top_h.get('attack')} (Prob: {top_h.get('probability')}, Cost: {top_h.get('estimated_cost')})")
+    except Exception as e:
+        print(f"  ⚠️ Attack selector ranking error: {e}")
 
     # 1. Encoding & Hash Detection
     try:
@@ -113,6 +139,28 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
     except Exception as e:
         print(f"  ⚠️ Hash/Encoding detection error: {e}")
         hash_analysis = {"full": {}, "substrings": [], "error": str(e)}
+
+    # 1b. Hash Dictionary & Wordlist Attack
+    if not verified_flag:
+        try:
+            from hash_cryptanalysis import identify_hash_type, dictionary_attack
+            tokens = re.findall(r'\b[a-fA-F0-9]{32,128}\b', challenge)
+            for tok in tokens:
+                htypes = identify_hash_type(tok)
+                if htypes:
+                    top_t = htypes[0]["type"]
+                    res = dictionary_attack(tok, top_t)
+                    if res.get("status") == "cracked":
+                        rec = res.get("plaintext", "")
+                        print(f"  🚩 VERIFIED HASH RECOVERED via Dictionary Attack: {rec}")
+                        flag_m = re.search(r'(flag\{.*?\}|ctf\{.*?\})', rec, re.IGNORECASE)
+                        verified_flag = flag_m.group(1) if flag_m else rec
+                        solved_category = "Hash Cryptanalysis"
+                        solved_attack = f"Dictionary Attack ({top_t})"
+                        solved_code = f"# Solved directly via hash_cryptanalysis dictionary attack\n# Hash: {tok} ({top_t})\nprint('{verified_flag}')\n"
+                        break
+        except Exception as e:
+            print(f"  ⚠️ Hash dictionary attack error: {e}")
 
     # 2. Classical Cryptanalysis Suite (skip on large-integer RSA/math challenges)
     classical_res = {}
@@ -218,12 +266,126 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
             print(f"  ⚠️ Symmetric cryptanalysis error: {e}")
             symmetric_res = {"status": "error", "error": str(e)}
 
+    # 5. PRNG Cryptanalysis Suite (LCG, MT19937, LFSR)
+    prng_res = {}
+    is_prng = bool(
+        re.search(r'\b(lcg|linear\s*congruential|mt19937|mersenne\s*twister|random\.random|untwist|lfsr|berlekamp|keystream|states?|seed)\b', challenge, re.IGNORECASE)
+        or re.search(r'\[\s*\d+\s*,\s*\d+\s*,\s*\d+.*\]', challenge)
+    )
+    if is_prng and not verified_flag:
+        print("  🎲 PRNG / LFSR parameters detected — executing PRNG Cryptanalysis Suite…")
+        try:
+            from prng_cryptanalysis import analyze_and_solve_prng
+            prng_res = analyze_and_solve_prng(challenge)
+            if prng_res.get("status") == "solved" and prng_res.get("flag"):
+                pt = prng_res["flag"]
+                atk = prng_res.get("attack", "PRNG Analysis")
+                verified_flag = pt
+                solved_category = "PRNG & LFSR"
+                solved_attack = atk
+                solved_code = f"# Solved directly via prng_cryptanalysis ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED PRNG FLAG RECOVERED via {atk}: {pt}")
+            else:
+                atk_sugg = prng_res.get("attack") or prng_res.get("generator") or "PRNG Analysis"
+                print(f"  ℹ️ PRNG Analysis initialized. Target attack: {atk_sugg}")
+        except Exception as e:
+            print(f"  ⚠️ PRNG cryptanalysis error: {e}")
+            prng_res = {"status": "error", "error": str(e)}
+
+    # 6. Lattice Cryptography Suite (Subset Sum, Merkle-Hellman, Clos-Chor-Lemke, CVP)
+    lattice_res = {}
+    is_lattice = bool(
+        re.search(r'\b(knapsack|subset.?sum|merkle.?hellman|lattice|lll|babai|closest.?vector|superincreasing)\b', challenge, re.IGNORECASE)
+        or (re.search(r'\b(weights?|public_key|target|s\s*=|sum\s*=)\b', challenge, re.IGNORECASE) and re.search(r'\[\s*\d+', challenge))
+    )
+    if is_lattice and not verified_flag:
+        print("  🕸️ Lattice / Knapsack parameters detected — executing Lattice Cryptography Suite…")
+        try:
+            from lattice_crypto import analyze_and_solve_lattice
+            lattice_res = analyze_and_solve_lattice(challenge)
+            if lattice_res.get("status") == "solved" and lattice_res.get("flag"):
+                pt = lattice_res["flag"]
+                atk = lattice_res.get("attack", "Lattice Cryptanalysis")
+                verified_flag = pt
+                solved_category = "Lattice Cryptography"
+                solved_attack = atk
+                solved_code = f"# Solved directly via lattice_crypto ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED LATTICE FLAG RECOVERED via {atk}: {pt}")
+            else:
+                atk_sugg = lattice_res.get("attack") or lattice_res.get("cipher") or "Lattice Analysis"
+                print(f"  ℹ️ Lattice Analysis initialized. Target attack: {atk_sugg}")
+        except Exception as e:
+            print(f"  ⚠️ Lattice cryptanalysis error: {e}")
+            lattice_res = {"status": "error", "error": str(e)}
+
+    # 7. Crypto-Steganography Suite (LSB planes, trailing data past EOF, embedded archive carving)
+    stego_res = {}
+    job_id = state.get("job_id")
+    input_dir = os.path.join("inputs", job_id) if job_id else "inputs"
+    has_images = False
+    if os.path.exists(input_dir):
+        for f in os.listdir(input_dir):
+            if f.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif', '.webp')):
+                has_images = True
+                break
+    if has_images and not verified_flag:
+        print("  🖼️ Image file(s) detected in input — executing Crypto-Steganography Suite…")
+        try:
+            from crypto_stego import analyze_and_solve_stego
+            stego_res = analyze_and_solve_stego(input_dir)
+            if stego_res.get("status") == "solved" and stego_res.get("flag"):
+                pt = stego_res["flag"]
+                atk = stego_res.get("attack", "Stego Analysis")
+                verified_flag = pt
+                solved_category = "Crypto-Steganography"
+                solved_attack = atk
+                solved_code = f"# Solved directly via crypto_stego ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED STEGO FLAG RECOVERED via {atk}: {pt}")
+            else:
+                findings_cnt = len(stego_res.get("findings", []))
+                print(f"  ℹ️ Stego Analysis initialized. Findings count: {findings_cnt}")
+        except Exception as e:
+            print(f"  ⚠️ Stego cryptanalysis error: {e}")
+            stego_res = {"status": "error", "error": str(e)}
+
+    # 8. Advanced Mathematical Cryptanalysis Suite
+    math_res = {}
+    is_adv_math = bool(
+        re.search(r'\b(bkz|groebner|buchberger|cantor|zassenhaus|hensel|tonelli|shanks|crt|chinese remainder|gaussian|lfsr|berlekamp|sat|z3)\b', challenge, re.IGNORECASE)
+    )
+    if is_adv_math and not verified_flag:
+        print("  🧮 Advanced Mathematical parameters detected — executing Advanced Math Suite…")
+        try:
+            from advanced_math_crypto import analyze_and_solve_advanced_math
+            math_res = analyze_and_solve_advanced_math(challenge)
+            if math_res.get("status") == "solved" and math_res.get("flag"):
+                pt = math_res["flag"]
+                atk = math_res.get("method", "Advanced Mathematical Cryptanalysis")
+                verified_flag = pt
+                solved_category = "Advanced Mathematical Cryptanalysis"
+                solved_attack = atk
+                solved_code = f"# Solved directly via advanced_math_crypto ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED ADVANCED MATH FLAG RECOVERED via {atk}: {pt}")
+            else:
+                checked = len(math_res.get("methods_checked", []))
+                print(f"  ℹ️ Advanced Math Analysis initialized. Checked: {checked} methods")
+        except Exception as e:
+            print(f"  ⚠️ Advanced math cryptanalysis error: {e}")
+            math_res = {"status": "error", "error": str(e)}
+
     result_dict = {
         "hash_analysis": hash_analysis,
         "classical_analysis": classical_res,
         "rsa_analysis": rsa_res,
         "ecc_analysis": ecc_res,
-        "symmetric_analysis": symmetric_res
+        "symmetric_analysis": symmetric_res,
+        "prng_analysis": prng_res,
+        "lattice_analysis": lattice_res,
+        "stego_analysis": stego_res,
+        "math_analysis": math_res,
+        "extracted_parameters": extracted_params,
+        "ranked_hypotheses": ranked_hypotheses,
+        "solution_report": None
     }
     # Only short-circuit if a genuine verified flag was recovered
     if verified_flag:
@@ -233,6 +395,21 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
         result_dict["execution_stdout"] = f"🚩 FLAG: {verified_flag}"
         result_dict["category"] = solved_category
         result_dict["attack_hypothesis"] = solved_attack
+        try:
+            from verification_engine import generate_solution_report
+            rep = generate_solution_report(
+                challenge_name="CTF Cryptographic Challenge",
+                category=solved_category,
+                vulnerability=solved_attack,
+                parameters=extracted_params,
+                attack_script=solved_code,
+                flag=verified_flag,
+                verified=True,
+                complexity="O(1) Direct Cryptanalysis"
+            )
+            result_dict["solution_report"] = rep
+        except Exception:
+            pass
 
     return result_dict
 
@@ -334,6 +511,70 @@ def classify_and_plan(state: CryptoAgentState) -> dict:
         if sa.get("explanation"):
             symmetric_ctx += f"  - Note: {sa['explanation']}\n"
 
+    # Inject PRNG / LFSR pre-analysis
+    prng_ctx = ""
+    pa = state.get("prng_analysis") or {}
+    if pa and (pa.get("generator") or pa.get("attack")):
+        prng_ctx = f"\n[PRNG / LFSR Parameters Detected]\n"
+        if pa.get("generator"):
+            prng_ctx += f"  - Generator: {pa['generator']}\n"
+        if pa.get("attack"):
+            prng_ctx += f"  - Suggested Attack: {pa['attack']}\n"
+        if pa.get("explanation"):
+            prng_ctx += f"  - Note: {pa['explanation']}\n"
+
+    # Inject Lattice pre-analysis
+    lattice_ctx = ""
+    la = state.get("lattice_analysis") or {}
+    if la and (la.get("cipher") or la.get("attack")):
+        lattice_ctx = f"\n[Lattice / Knapsack Cryptography Detected]\n"
+        if la.get("cipher"):
+            lattice_ctx += f"  - Cipher: {la['cipher']}\n"
+        if la.get("attack"):
+            lattice_ctx += f"  - Suggested Attack: {la['attack']}\n"
+        if la.get("explanation"):
+            lattice_ctx += f"  - Note: {la['explanation']}\n"
+
+    # Inject Steganography pre-analysis
+    stego_ctx = ""
+    sta = state.get("stego_analysis") or {}
+    if sta and sta.get("findings"):
+        stego_ctx = f"\n[Steganography Findings Detected]\n"
+        for finding in sta.get("findings", [])[:3]:
+            stego_ctx += f"  - File: {finding.get('file')} | Method: {finding.get('method')} | Note: {finding.get('description')}\n"
+
+    # Inject Advanced Mathematical pre-analysis
+    math_ctx = ""
+    ma = state.get("math_analysis") or {}
+    if ma and (ma.get("method") or ma.get("methods_checked")):
+        math_ctx = f"\n[Advanced Mathematical Cryptanalysis Detected]\n"
+        if ma.get("method"):
+            math_ctx += f"  - Target Method: {ma['method']}\n"
+        if ma.get("methods_checked"):
+            math_ctx += f"  - Applicable Algorithms: {', '.join(ma['methods_checked'])}\n"
+
+    # Inject CTF Knowledge Base & RAG Exploit Guidance
+    rag_ctx = ""
+    try:
+        from ctf_knowledge_base import retrieve_attack_guidance
+        rag_recipes = retrieve_attack_guidance(state['challenge'], top_k=2)
+        if rag_recipes:
+            rag_ctx = "\n[CTF Knowledge Base & RAG Exploit Guidance]\n"
+            for r in rag_recipes:
+                title = r.get('title') or r.get('vulnerability', 'Exploit Recipe')
+                summary = r.get('summary') or r.get('explanation', '')
+                rag_ctx += f"  - Recipe: {title} ({r.get('domain', 'Crypto')})\n    Method: {summary[:160]}\n"
+    except Exception:
+        pass
+
+    # Inject autonomous attack ranking hypotheses
+    rank_ctx = ""
+    ranked_hyps = state.get("ranked_hypotheses") or []
+    if ranked_hyps:
+        rank_ctx = "\n[Autonomous Attack Hypotheses (Ranked by Probability & Cost)]\n"
+        for idx, h in enumerate(ranked_hyps[:5], 1):
+            rank_ctx += f"  {idx}. Attack: {h.get('attack')} | Prob: {h.get('probability')} | Cost: {h.get('estimated_cost')} | Category: {h.get('category')}\n     Rationale: {h.get('rationale')}\n"
+
     engine_option = '"python" or "sage"' if SAGE_AVAILABLE else '"python" (SageMath/Docker is NOT installed. You MUST select python)'
     engine_format = '<python or sage>' if SAGE_AVAILABLE else 'python'
 
@@ -342,31 +583,16 @@ You are an expert cryptographic security auditor and CTF player.
 Analyze the given parameters and determine the vulnerability.
 
 Key CTF Rules of Thumb:
-Symmetric Cryptography (AES, DES, 3DES, Blowfish, ChaCha20, RC4) Attacks:
-- ECB Byte-at-a-Time Attack: oracle encrypts prefix || secret || pad in ECB mode. Recover unknown secret suffix byte-by-byte via dictionary block matching.
-- CBC Bit-Flipping Attack: flip bit positions in ciphertext block C_{{i-1}} to precisely alter decrypted plaintext block P_i: C_{{i-1}}'[k] = C_{{i-1}}[k] ^ P_i[k] ^ Target_i[k].
-- Padding Oracle Attack: server returns padding validity. Decrypt full ciphertext block-by-block, byte-by-byte using Vaudenay's technique without knowing the key.
-- CTR Nonce Reuse Attack: same nonce/IV reused across multiple messages. C1 ^ C2 = P1 ^ P2; recover keystream and decrypt all plaintexts.
-- GCM Nonce Reuse Attack: reused nonce in AES-GCM leaks keystream and enables GHASH subkey H recovery over GF(2^128) via polynomial root finding for authentication forgery.
-- Known-Plaintext Attack (KPA): derive keystream KS = P ^ C for stream ciphers, or brute-force weak/short keys matching E_K(P) = C.
-- Chosen-Plaintext Attack (CPA): distinguish ECB vs CBC mode with 2x block repeated inputs, determine IV randomization and block boundaries.
-- Differential Cryptanalysis: difference distribution table (DDT) tracks Delta_P -> Delta_C through S-Boxes to filter candidate subkeys.
-- Linear Cryptanalysis: linear approximation table (LAT) and Matsui's Piling-up Lemma determine optimal parity masks and recover key bits with maximum bias.
-- Meet-in-the-Middle Attack (MITM): crack double encryption C = E_K2(E_K1(P)) in O(2^k) time and space by computing forward table {{E_K1(P): K1}} and matching D_K2(C).
-
-Elliptic Curve Cryptography (ECC) Attacks:
-- Baby-Step Giant-Step (BSGS): solve discrete log Q = d*P in O(sqrt(N)) when scalar d <= 10^7 or small subgroup order.
-- Pollard's Rho for ECDLP: general low-memory cycle detection discrete logarithm attack.
-- Pohlig-Hellman: curve order n = #E(F_p) factors into small prime factors (smooth order); solve subgroups and recombine via CRT.
-- Smart's Attack (Anomalous Curves): curve order #E(F_p) == p (trace of Frobenius t = 1); solve ECDLP in O(log^3 p) via p-adic formal group log.
-- Invalid Curve Attack: server fails to validate if P is on curve y^2 = x^3 + a*x + b; send point on invalid curve with small order to recover d mod order.
-- Small Subgroup / Twist Attack: cofactor h = #E / r > 1; small subgroup point leaks d mod small factors.
-- ECDSA Nonce Reuse: same nonce k reused across two signatures (r, s1) and (r, s2) with hashes z1, z2; recover k = (z1 - z2)/(s1 - s2) mod n, d = (s1*k - z1)/r mod n.
-- Biased Nonce Attack (HNP): partial nonce bits leaked or biased; form Hidden Number Problem matrix and recover private key d via LLL lattice reduction.
-- LLL-based ECDSA Attack: partial nonce MSB/LSB leakages across multiple signatures recovered via Kannan's embedding and LLL.
-- ECDLP Scalar Recovery: recover private scalar d such that Q = d*P.
+Hash Cryptanalysis:
+- Hash Type Identification: detect MD5, SHA-1, SHA-224/256/384/512, SHA-3, NTLM by character length (32, 40, 56, 64, 96, 128 hex chars).
+- Dictionary & Wordlist Attack: check candidate hashes against common CTF wordlists and keywords.
+- Length Extension Attack: Merkle-Damgård hashes (MD5, SHA-1, SHA-256, SHA-512) where H(secret || msg) is used. Reconstruct internal MD state and forge extensions without knowing secret.
+- Birthday Attack: collision demonstration in 2^(n/2) operations.
 
 RSA & Asymmetric Attacks:
+- RSA Parity Oracle: decrypt (c * 2^e mod N) to test least significant bit parity; binary search m in interval [0, N) in O(log N) oracle queries.
+- Bleichenbacher PKCS#1 v1.5 Padding Oracle: adaptive chosen-ciphertext attack querying validity oracle to narrow down blinding intervals [2B, 3B-1].
+- Weak Prime Detection: test small prime factors, Fermat closeness (|p-q| < N^0.25), and ROCA Infineon pattern.
 - Wiener Attack: large e comparable to N (e > N^0.5, small private d < (1/3)*N^0.25).
 - Boneh-Durfee Attack: small private exponent d < N^0.292 beyond Wiener bound via LLL lattice.
 - Fermat Factorization: primes are close (|p - q| < N^0.25 or isqrt(N)).
@@ -380,6 +606,19 @@ RSA & Asymmetric Attacks:
 - Trial Division: factors with small primes.
 - ROCA (CVE-2017-15361): vulnerable Infineon key generation (p = k*M + 65537^a mod M).
 - Bellcore CRT Fault Attack: differential fault in RSA-CRT signature (gcd(s - s', N)).
+
+Elliptic Curve Cryptography (ECC) Attacks:
+- Curve25519 & Ed25519: Montgomery ladder X-only scalar multiplication and Twisted Edwards complete addition laws.
+- Baby-Step Giant-Step (BSGS): solve discrete log Q = d*P in O(sqrt(N)) when scalar d <= 10^7 or small subgroup order.
+- Pollard's Rho for ECDLP: general low-memory cycle detection discrete logarithm attack.
+- Pohlig-Hellman: curve order n = #E(F_p) factors into small prime factors (smooth order); solve subgroups and recombine via CRT.
+- Smart's Attack (Anomalous Curves): curve order #E(F_p) == p (trace of Frobenius t = 1); solve ECDLP in O(log^3 p) via p-adic formal group log.
+- Invalid Curve Attack: server fails to validate if P is on curve y^2 = x^3 + a*x + b; send point on invalid curve with small order to recover d mod order.
+- Small Subgroup / Twist Attack: cofactor h = #E / r > 1; small subgroup point leaks d mod small factors.
+- ECDSA Nonce Reuse: same nonce k reused across two signatures (r, s1) and (r, s2) with hashes z1, z2; recover k = (z1 - z2)/(s1 - s2) mod n, d = (s1*k - z1)/r mod n.
+- Biased Nonce Attack (HNP): partial nonce bits leaked or biased; form Hidden Number Problem matrix and recover private key d via LLL lattice reduction.
+- LLL-based ECDSA Attack: partial nonce MSB/LSB leakages across multiple signatures recovered via Kannan's embedding and LLL.
+- ECDLP Scalar Recovery: recover private scalar d such that Q = d*P.
 Classical Ciphers:
 - Caesar / ROT13: single shift across 1-25. If ROT47: shifts ASCII 33-126.
 - Affine: C = (a*P + b) mod 26 where gcd(a,26)=1. Brute-force 312 keys or use 2 known letter pairs.
@@ -409,10 +648,16 @@ General:
 <|start_header_id|>user<|end_header_id|>
 Challenge:
 {state['challenge']}
+{rank_ctx}
 {hash_ctx}
 {rsa_ctx}
 {ecc_ctx}
 {symmetric_ctx}
+{prng_ctx}
+{lattice_ctx}
+{stego_ctx}
+{math_ctx}
+{rag_ctx}
 {classical_ctx}
 {previous_failure}
 
@@ -540,7 +785,7 @@ def generate_solver(state: CryptoAgentState) -> dict:
             f"You can import and use:\n"
             f"  from rsa_cryptanalysis import RSAMath, RSAAttacks, LatticeLLL, analyze_and_solve_rsa\n"
             f"  - RSAMath: gcd, lcm, xgcd, modinv, modpow, iroot, is_square, euler_phi, carmichael_lambda, crt, continued_fractions, convergents, clean_flag_or_text\n"
-            f"  - RSAAttacks: attack_wiener, attack_boneh_durfee, attack_common_modulus, attack_hastad_broadcast, attack_small_exponent_root, factor_fermat, factor_trial_division, factor_pollard_rho, factor_pollard_p_minus_1, attack_franklin_reiter, attack_coppersmith_stereotyped, private_key_recovery, detect_roca, factor_roca\n"
+            f"  - RSAAttacks: attack_wiener, attack_boneh_durfee, attack_common_modulus, attack_hastad_broadcast, attack_small_exponent_root, factor_fermat, factor_trial_division, factor_pollard_rho, factor_pollard_p_minus_1, attack_franklin_reiter, attack_coppersmith_stereotyped, private_key_recovery, detect_roca, factor_roca, attack_parity_oracle, detect_weak_primes, bleichenbacher_step_simulation\n"
             f"  - LatticeLLL: reduce(basis, delta=0.75)"
         )
 
@@ -551,8 +796,10 @@ def generate_solver(state: CryptoAgentState) -> dict:
         ecc_hint = (
             f"\n[ECC Mathematics & Cryptanalysis Helpers Available in ecc_cryptanalysis]\n"
             f"You can import and use:\n"
-            f"  from ecc_cryptanalysis import EllipticCurve, ECPoint, ECCAttacks, analyze_and_solve_ecc\n"
+            f"  from ecc_cryptanalysis import EllipticCurve, ECPoint, MontgomeryCurve, TwistedEdwardsCurve, STANDARD_CURVES, get_standard_curve, ECCAttacks, analyze_and_solve_ecc\n"
             f"  - EllipticCurve: add(P, Q), multiply(P, k), is_on_curve(P), decompress_point(x, y_parity)\n"
+            f"  - MontgomeryCurve (Curve25519): ladder(x_P, k)\n"
+            f"  - TwistedEdwardsCurve (Ed25519): add(P, Q), multiply(P, k)\n"
             f"  - ECCAttacks: attack_ecdlp_bsgs, attack_ecdlp_pollard_rho, attack_pohlig_hellman, attack_smart_anomalous, attack_invalid_curve, attack_small_subgroup, attack_ecdsa_nonce_reuse, attack_ecdsa_biased_nonce_lll, attack_ecdsa_partial_nonce_leak\n"
         )
 
@@ -568,6 +815,88 @@ def generate_solver(state: CryptoAgentState) -> dict:
             f"  - SymmetricAttacks: attack_ecb_byte_at_a_time, attack_cbc_bit_flip, attack_padding_oracle, attack_ctr_nonce_reuse, attack_gcm_nonce_reuse, attack_known_plaintext, attack_chosen_plaintext, attack_differential_cryptanalysis, attack_linear_cryptanalysis, attack_meet_in_the_middle\n"
         )
 
+    # Inject PRNG hints into the solver prompt
+    prng_hint = ""
+    pa = state.get("prng_analysis") or {}
+    if pa and (pa.get("generator") or pa.get("attack")):
+        prng_hint = (
+            f"\n[PRNG & LFSR Cryptanalysis Helpers Available in prng_cryptanalysis]\n"
+            f"You can import and use:\n"
+            f"  from prng_cryptanalysis import MT19937Recoverer, solve_lcg_known_m, solve_lcg_unknown_m, berlekamp_massey_gf2, predict_lfsr_bits, analyze_and_solve_prng\n"
+            f"  - MT19937Recoverer: recover full 624-word state from 624 32-bit outputs and clone python random.Random\n"
+            f"  - solve_lcg_known_m(outputs, m): recover multiplier a and increment c\n"
+            f"  - solve_lcg_unknown_m(outputs): recover modulus m, multiplier a, and increment c from 6+ outputs\n"
+            f"  - berlekamp_massey_gf2(bits): recover minimal LFSR connection polynomial\n"
+        )
+
+    # Inject Lattice hints into the solver prompt
+    lattice_hint = ""
+    la = state.get("lattice_analysis") or {}
+    if la and (la.get("cipher") or la.get("attack")):
+        lattice_hint = (
+            f"\n[Lattice Cryptanalysis Helpers Available in lattice_crypto]\n"
+            f"You can import and use:\n"
+            f"  from lattice_crypto import lll_reduction, solve_subset_sum_clos, solve_merkle_hellman, babai_nearest_plane, analyze_and_solve_lattice\n"
+            f"  - lll_reduction(basis, delta=0.75): exact rational LLL reduction\n"
+            f"  - solve_subset_sum_clos(weights, target_sum): solve low-density knapsack via Clos-Chor-Lemke embedding\n"
+            f"  - solve_merkle_hellman(public_key, cipher_sum): decrypt Merkle-Hellman knapsack cryptosystem\n"
+            f"  - babai_nearest_plane(basis, target): Closest Vector Problem (CVP) solver\n"
+        )
+
+    # Inject Stego hints into the solver prompt
+    stego_hint = ""
+    sta = state.get("stego_analysis") or {}
+    if sta and sta.get("findings"):
+        stego_hint = (
+            f"\n[Crypto-Steganography Helpers Available in crypto_stego]\n"
+            f"You can import and use:\n"
+            f"  from crypto_stego import extract_lsb_bytes, carve_trailing_data, search_flag_or_magic, analyze_and_solve_stego\n"
+            f"  - extract_lsb_bytes(image_path, channel, plane): extract bit planes from RGB channels\n"
+            f"  - carve_trailing_data(image_path): extract payloads appended past PNG IEND / JPEG EOI\n"
+        )
+
+    # Inject Remote Socket Bridge hints into the solver prompt
+    socket_hint = (
+        f"\n[Remote Netcat Socket Bridge Available in remote_socket_bridge]\n"
+        f"You can import and use:\n"
+        f"  from remote_socket_bridge import RemoteSocketClient, parse_nc_command, probe_remote_service, solve_remote_padding_oracle\n"
+        f"  - RemoteSocketClient(host, port, timeout=5, ssl_wrap=False): client.connect(), recvuntil(delim), sendline(msg), close()\n"
+    )
+
+    # Inject Advanced Mathematical Cryptanalysis hints
+    math_hint = (
+        f"\n[Advanced Mathematical Cryptanalysis Helpers Available in advanced_math_crypto]\n"
+        f"You can import and use:\n"
+        f"  from advanced_math_crypto import (\n"
+        f"      xgcd, modinv, legendre_symbol, jacobi_symbol, tonelli_shanks,\n"
+        f"      crt, generalized_crt, gaussian_elimination_gf2, gaussian_elimination_gfp,\n"
+        f"      lll_reduction, bkz_reduction, solve_cvp_babai, solve_knapsack_clos,\n"
+        f"      find_roots_cantor_zassenhaus, hensel_lift_root, buchberger_groebner_basis,\n"
+        f"      GF2m, discrete_log_bsgs, discrete_log_pohlig_hellman, factor_pollard_rho,\n"
+        f"      PurePythonSATSolver, Z3ConstraintSolverWrapper, berlekamp_massey_field,\n"
+        f"      lfsr_predict_bits, untemper_mt19937_32, untemper_mt19937_64, solve_lcg_parameters\n"
+        f"  )\n"
+    )
+
+    # Inject Hash Cryptanalysis hints
+    hash_crypto_hint = (
+        f"\n[Hash Cryptanalysis Helpers Available in hash_cryptanalysis]\n"
+        f"You can import and use:\n"
+        f"  from hash_cryptanalysis import identify_hash_type, compute_hash, dictionary_attack, brute_force_attack, generate_merkle_damgard_padding, length_extension_analysis, generate_cracking_commands, birthday_collision_demo\n"
+        f"  - identify_hash_type(hex_hash): returns matching candidate algorithms\n"
+        f"  - dictionary_attack(hex_hash, algo): cracks against embedded wordlists\n"
+        f"  - length_extension_analysis(orig_hash, orig_len, extension, algo): produces padded extension payload\n"
+    )
+
+    # Inject Verification & Report hints
+    verification_hint = (
+        f"\n[Verification & Report Helpers Available in verification_engine]\n"
+        f"You can import and use:\n"
+        f"  from verification_engine import extract_flag, validate_plaintext, verify_rsa_roundtrip, generate_solution_report\n"
+        f"  - extract_flag(text): searches configurable CTF regexes\n"
+        f"  - validate_plaintext(text): statistical sanity and printable check\n"
+    )
+
     prompt = f"""<|begin_of_text|><|start_header_id|>system<|end_header_id|>
 You are a solver generator for cryptographic CTFs.
 Write a standalone, self-contained {engine_name} script that executes the exploit and prints the flag.
@@ -578,10 +907,17 @@ Challenge:
 
 Attack Strategy: {state.get('attack_hypothesis')}
 {hash_hint}
+{hash_crypto_hint}
 {rsa_hint}
 {ecc_hint}
 {symmetric_hint}
+{prng_hint}
+{lattice_hint}
+{stego_hint}
+{socket_hint}
+{math_hint}
 {classical_hint}
+{verification_hint}
 {sage_notice}
 {feedback}
 
@@ -612,8 +948,13 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
     if stderr.strip():
         print(f"⚠️ Error:\n{stderr.strip()}")
 
-    flag_match = re.search(r"(flag\{.*?\}|CTF\{.*?\})", stdout, re.IGNORECASE)
-    flag = flag_match.group(1) if flag_match else None
+    flag = None
+    try:
+        from verification_engine import extract_flag, validate_plaintext
+        flag = extract_flag(stdout)
+    except Exception:
+        flag_match = re.search(r"(flag\{.*?\}|CTF\{.*?\})", stdout, re.IGNORECASE)
+        flag = flag_match.group(1) if flag_match else None
 
     # Decoded result: extract flag{} format if present, or clean stdout text if successful
     decoded_res = None
@@ -625,10 +966,31 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
             candidate = lines[-1] if len(lines) > 1 and ("error" not in lines[-1].lower()) else "\n".join(lines)
             # Ensure the output is NOT simply echoing the input challenge text
             if candidate != state["challenge"].strip():
-                decoded_res = candidate
+                try:
+                    from verification_engine import validate_plaintext
+                    val_res = validate_plaintext(candidate)
+                    if val_res.get("is_valid"):
+                        decoded_res = candidate
+                except Exception:
+                    decoded_res = candidate
 
-    if decoded_res:
+    report = None
+    if decoded_res or flag:
         print(f"✨ DECODED RESULT:\n{decoded_res}")
+        try:
+            from verification_engine import generate_solution_report
+            report = generate_solution_report(
+                challenge_name="CTF Cryptographic Challenge",
+                category=state.get("category") or "Cryptanalysis",
+                vulnerability=state.get("attack_hypothesis") or "Cryptographic Exploit",
+                parameters=state.get("extracted_parameters") or {},
+                attack_script=code,
+                flag=decoded_res or flag or "",
+                verified=True,
+                complexity="Polynomial"
+            )
+        except Exception as e:
+            report = f"Report generation error: {e}"
     else:
         print("❌ No decoded result captured on this attempt.")
 
@@ -641,6 +1003,7 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
         "execution_stderr": stderr if (res["exit_code"] != 0 or not decoded_res) else "",
         "captured_flag": decoded_res,
         "decoded_result": decoded_res,
+        "solution_report": report,
         "is_sage": is_sage_state,
         "iteration": state["iteration"] + 1
     }
@@ -698,6 +1061,13 @@ else:
                 "rsa_analysis": None,
                 "ecc_analysis": None,
                 "symmetric_analysis": None,
+                "prng_analysis": None,
+                "lattice_analysis": None,
+                "stego_analysis": None,
+                "math_analysis": None,
+                "extracted_parameters": None,
+                "ranked_hypotheses": None,
+                "solution_report": None,
                 "job_id": initial_state.get("job_id")
             }
             # Pre-step: Hash, Encoding & Direct Solvers
