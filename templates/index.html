@@ -879,6 +879,29 @@ textarea:focus{
   content:'';flex:1;height:1px;background:rgba(148,163,184,.08);
 }
 .section-divider span{font-size:12px;color:var(--text-3);font-weight:600;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   BUG BOUNTY TARGET AUDIT CARD & STYLES
+══════════════════════════════════════════════════════════════════════════ */
+#bounty-card{display:none;border-color:rgba(239,68,68,.25);}
+.bounty-finding-item{
+  border-radius:var(--radius-sm);
+  border:1px solid rgba(148,163,184,.1);
+  background:rgba(0,0,0,.25);
+  padding:12px 14px;
+  margin-bottom:8px;
+  transition:all var(--transition);
+}
+.bounty-finding-item:hover{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.03);}
+.bounty-sev-badge{
+  font-family:'JetBrains Mono',monospace;
+  font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:4px;text-transform:uppercase;display:inline-block;
+}
+.bounty-sev-CRITICAL{background:rgba(239,68,68,.25);color:#fca5a5;border:1px solid rgba(239,68,68,.5);}
+.bounty-sev-HIGH{background:rgba(249,115,22,.2);color:#fdba74;border:1px solid rgba(249,115,22,.4);}
+.bounty-sev-MEDIUM{background:rgba(234,179,8,.15);color:#fde047;border:1px solid rgba(234,179,8,.35);}
+.bounty-sev-LOW{background:rgba(59,130,246,.15);color:#93c5fd;border:1px solid rgba(59,130,246,.35);}
+.bounty-sev-INFO{background:rgba(148,163,184,.15);color:#cbd5e1;border:1px solid rgba(148,163,184,.3);}
   </style>
 </head>
 <body>
@@ -970,6 +993,30 @@ textarea:focus{
           <input type="text" id="nc-target" placeholder="e.g. nc chall.ctf.org 1337 or chall.ctf.org:1337" style="width:100%;background:var(--ink-2);border:1px solid rgba(148,163,184,.12);border-radius:var(--radius-sm);color:var(--text-1);font-family:'JetBrains Mono',monospace;font-size:13px;padding:9px 12px;outline:none;" />
         </div>
 
+        <!-- ── Bug Bounty Target URL Auditor Field ────────────────── -->
+        <div class="bounty-panel" style="margin-top:18px;background:rgba(239,68,68,.04);border:1px solid rgba(239,68,68,.25);border-radius:var(--radius-sm);padding:12px 14px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+            <label class="field-label" style="margin:0;color:#f87171;display:flex;align-items:center;gap:6px;">
+              <span>🎯</span> Bug Bounty Target URL
+            </label>
+            <span style="font-size:10.5px;color:rgba(239,68,68,.9);font-family:'JetBrains Mono',monospace;background:rgba(239,68,68,.12);padding:2px 7px;border-radius:4px;border:1px solid rgba(239,68,68,.25);">AGENTS.md SCOPE GATED</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="url" id="bounty-url" placeholder="https://api.target.com/v1/auth" style="flex:1;background:var(--ink-2);border:1px solid rgba(239,68,68,.3);border-radius:var(--radius-sm);color:var(--text-1);font-family:'JetBrains Mono',monospace;font-size:12.5px;padding:8px 11px;outline:none;" />
+            <button type="button" id="btn-audit-bounty" style="background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.45);color:#fca5a5;padding:8px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all .15s ease;">
+              🔍 Audit URL
+            </button>
+          </div>
+          <div style="margin-top:8px;display:flex;gap:8px;">
+            <input type="text" id="bounty-program" placeholder="Program Name (e.g. Target Corp)" style="flex:1;background:var(--ink-2);border:1px solid rgba(148,163,184,.12);border-radius:var(--radius-sm);color:var(--text-2);font-size:11.5px;padding:5px 8px;outline:none;" />
+            <input type="text" id="bounty-scope" placeholder="In-Scope Line (e.g. *.target.com)" style="flex:1;background:var(--ink-2);border:1px solid rgba(148,163,184,.12);border-radius:var(--radius-sm);color:var(--text-2);font-size:11.5px;padding:5px 8px;outline:none;" />
+          </div>
+          <div style="color:var(--text-3);font-size:10.5px;margin-top:6px;display:flex;align-items:center;gap:5px;">
+            <span>🛡️</span>
+            <span>Passive security check: TLS transport, HSTS/CSP headers, cookie flags, JWT flaws &amp; crypto smells. Non-destructive.</span>
+          </div>
+        </div>
+
         <label class="field-label" style="margin-top:18px;">Attach Files <span style="color:var(--text-3);font-weight:400;text-transform:none;font-size:11px;">(Supports multiple files &amp; multi-format: code, keys, ciphertexts, images)</span></label>
         <div class="upload-zone" id="upload-zone">
           <input type="file" id="file-input" multiple />
@@ -1030,6 +1077,7 @@ textarea:focus{
           <label class="cat-card" data-val="Encoding"><input type="radio" name="category" value="Encoding" /><span class="cat-emoji">🔡</span><span class="cat-name">Encoding</span></label>
           <label class="cat-card" data-val="Binary"><input type="radio" name="category" value="Binary" /><span class="cat-emoji">🔢</span><span class="cat-name">Binary</span></label>
           <label class="cat-card" data-val="Custom"><input type="radio" name="category" value="Custom" /><span class="cat-emoji">⚔️</span><span class="cat-name">Custom</span></label>
+          <label class="cat-card" data-val="BugBounty"><input type="radio" name="category" value="BugBounty" /><span class="cat-emoji">🎯</span><span class="cat-name">Bug Bounty</span></label>
         </div>
 
         <label class="field-label" style="margin-top:20px;">Attack Strategy</label>
@@ -1134,11 +1182,19 @@ textarea:focus{
           <div class="att-chip" data-val="Subset-Sum Clos-Chor-Lemke">🕸️ Clos-Chor-Lemke Subset Sum (LLL)</div>
           <div class="att-chip" data-val="Merkle-Hellman Knapsack">🎒 Merkle-Hellman Cryptanalysis</div>
           <div class="att-chip" data-val="Babai Nearest Plane CVP">🎯 Babai's Nearest Plane (CVP)</div>
+          <div class="att-chip" data-val="NTRU Lattice Reduction">🌀 NTRU Polynomial Lattice</div>
+          <div class="att-chip" data-val="LWE Kannan Embedding">📐 LWE Kannan Embedding</div>
 
           <div class="att-section-label">Crypto-Steganography &amp; Network Socket</div>
           <div class="att-chip" data-val="LSB Bit-Plane Steganography">🖼️ LSB Plane Extractor (RGB)</div>
           <div class="att-chip" data-val="Trailing File Data Carving">✂️ Trailing Data Carving (PNG/JPEG)</div>
           <div class="att-chip" data-val="Remote Netcat Socket Oracle">🌐 Netcat Socket Interactive Probe</div>
+          <div class="att-chip" data-val="Interactive Netcat Oracle">⚡ Auto Interactive Netcat Oracle</div>
+
+          <div class="att-section-label">Custom Cipher &amp; Symbolic Bitwise Reverser</div>
+          <div class="att-chip" data-val="Z3 Symbolic Reverser">🧩 Z3 Symbolic Bitwise Reverser</div>
+          <div class="att-chip" data-val="Byte Preimage Inversion">🔄 Byte Preimage Inverter</div>
+          <div class="att-chip" data-val="Custom Feistel Reversal">🪜 Feistel Network Reverser</div>
 
           <div class="att-section-label">Advanced Mathematical Cryptanalysis (18 Disciplines)</div>
           <div class="att-chip" data-val="BKZ Lattice Reduction">🧮 BKZ Block Lattice Reduction</div>
@@ -1151,6 +1207,17 @@ textarea:focus{
           <div class="att-chip" data-val="SAT/SMT Constraint Solver">🧩 DPLL SAT / SMT Solver</div>
           <div class="att-chip" data-val="Finite Field GF(2^m) Arithmetic">🛡️ GF(2^m) Field Arithmetic</div>
           <div class="att-chip" data-val="Pohlig-Hellman Discrete Log">🐾 Pohlig-Hellman Smooth DLog</div>
+
+          <div class="att-section-label">Crypto Bug Bounty Assistant (AGENTS.md)</div>
+          <div class="att-chip" data-val="Scope Hard Gate Check">🛑 Scope Gatekeeper Check</div>
+          <div class="att-chip" data-val="JWT alg:none Bypass">🔓 JWT alg:none Bypass</div>
+          <div class="att-chip" data-val="JWT Key Confusion (RS256->HS256)">🔀 JWT RS256/HS256 Confusion</div>
+          <div class="att-chip" data-val="Weak JWT Secret Crack">🔑 Weak JWT HMAC Secret Crack</div>
+          <div class="att-chip" data-val="MT19937 Token Seeding">🎲 MT19937 Token Seed Correlation</div>
+          <div class="att-chip" data-val="Sequential Token Counter">🔢 Sequential Reset Token Counter</div>
+          <div class="att-chip" data-val="ECB Cookie Leakage">🍪 ECB Cookie Block Repetition</div>
+          <div class="att-chip" data-val="GCM Nonce Reuse Check">💥 AES-GCM Nonce Reuse</div>
+          <div class="att-chip" data-val="10-Point Bounty Report">📝 10-Point Bounty Report (CVSS/CWE)</div>
         </div>
       </div>
     </div>
@@ -1246,7 +1313,10 @@ textarea:focus{
       <div class="code-viewer" id="report-viewer" style="display:none;margin-top:16px;">
         <div class="code-topbar">
           <span class="code-lang">📋 10-Point CTF Solution Report</span>
-          <button class="code-copy" id="report-copy">Copy Report</button>
+          <div style="display:flex;gap:8px;">
+            <button class="code-copy" id="report-copy">Copy Report</button>
+            <button class="code-copy" id="writeup-export-btn" style="background:rgba(6,182,212,.2);border-color:rgba(6,182,212,.4);color:var(--cyan-l);">Export Writeup (.md)</button>
+          </div>
         </div>
         <pre><code class="language-markdown" id="report-text" style="white-space:pre-wrap;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text-1);"></code></pre>
       </div>
@@ -1267,6 +1337,24 @@ textarea:focus{
         </div>
       </div>
       <div class="hash-card-inner" id="hash-card-inner"><!-- filled by JS --></div>
+    </div>
+
+    <!-- ── Bug Bounty Target Audit Card ─────────────────────────── -->
+    <div class="card" id="bounty-card" style="display:none;border-color:rgba(239,68,68,.3);margin-top:20px;">
+      <div class="card-head" style="background:rgba(239,68,68,.05);">
+        <div class="card-head-left">
+          <div class="step-badge" style="background:linear-gradient(135deg,#ef4444,#f97316)">🎯</div>
+          <div>
+            <div class="card-title" style="color:#fca5a5;">Bug Bounty Target Audit</div>
+            <div class="card-sub" id="bounty-card-sub">Live target security evaluation</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <span id="bounty-grade-badge" style="font-family:'JetBrains Mono',monospace;font-weight:800;font-size:13px;padding:3px 10px;border-radius:4px;background:rgba(239,68,68,.2);color:#fca5a5;border:1px solid rgba(239,68,68,.4);">Grade: ?</span>
+          <button type="button" class="code-copy" id="bounty-report-btn" style="background:rgba(239,68,68,.2);border-color:rgba(239,68,68,.4);color:#fca5a5;display:none;">📋 View 10-Point Report</button>
+        </div>
+      </div>
+      <div class="hash-card-inner" id="bounty-card-inner" style="padding:18px 20px;"><!-- filled by JS --></div>
     </div>
 
   </div><!-- /right-panel -->
@@ -1538,6 +1626,85 @@ textarea:focus{
         <span class="catalog-tag">Plaintext Sanity</span>
         <span class="catalog-tag">RSA Round-trip</span>
         <span class="catalog-tag">10-Point Synthesis</span>
+      </div>
+    </div>
+
+    <!-- Custom Bitwise & Z3 Symbolic Reverser -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>⚡</span> Custom Bitwise &amp; Z3 Symbolic Reverser</div>
+        <span class="catalog-badge badge-symm">Z3 &amp; PureBitVec</span>
+      </div>
+      <div class="catalog-desc">
+        Pure-Python AST and Z3 symbolic bitwise expression solver, custom Feistel network inverter, 256-state byte lookup preimage searcher, indexed transform inverters, and GF(2) linear system solvers for reversing non-standard CTF challenges.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">PureBitVec AST</span>
+        <span class="catalog-tag">Z3 SMT Solver</span>
+        <span class="catalog-tag">Custom Feistel Inversion</span>
+        <span class="catalog-tag">Byte Preimage Search</span>
+        <span class="catalog-tag">GF(2) Gaussian Solver</span>
+        <span class="catalog-tag">Bitwise Scrambler Reversal</span>
+      </div>
+    </div>
+
+    <!-- Post-Quantum NTRU & LWE Lattice Suite -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🌐</span> Post-Quantum NTRU &amp; LWE Lattice Suite</div>
+        <span class="catalog-badge badge-lattice">Lattice &amp; PQC</span>
+      </div>
+      <div class="catalog-desc">
+        Post-quantum cryptanalysis engine supporting Coppersmith-Shamir circulant lattice reduction for NTRU public key decryption, polynomial ring convolution arithmetic in Zq[x]/(x^N - 1), and Kannan embedding for Learning With Errors (LWE).
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">NTRU Key Recovery</span>
+        <span class="catalog-tag">LWE Kannan Embedding</span>
+        <span class="catalog-tag">Circulant Lattice</span>
+        <span class="catalog-tag">Ring Convolution</span>
+        <span class="catalog-tag">LLL Reduction</span>
+        <span class="catalog-tag">CVP / SVP Solver</span>
+      </div>
+    </div>
+
+    <!-- Autonomous Interactive Socket Oracle Engine -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🔌</span> Autonomous Interactive Socket Oracle</div>
+        <span class="catalog-badge badge-xor">Socket &amp; Oracles</span>
+      </div>
+      <div class="catalog-desc">
+        Autonomous TCP netcat service interactor with dynamic banner extraction, interactive CLI menu parsing, automated padding oracle probes, and RSA parity leak wrappers for live CTF remote servers.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Netcat TCP Session</span>
+        <span class="catalog-tag">Interactive Menu Parsing</span>
+        <span class="catalog-tag">Padding Oracle Adapter</span>
+        <span class="catalog-tag">RSA Parity Oracle</span>
+        <span class="catalog-tag">Auto Probe &amp; Solve</span>
+        <span class="catalog-tag">Remote CTF Exploitation</span>
+      </div>
+    </div>
+
+    <!-- Crypto Bug Bounty Assistant (AGENTS.md) -->
+    <div class="catalog-card">
+      <div class="catalog-head">
+        <div class="catalog-title"><span>🎯</span> Crypto Bug Bounty Assistant</div>
+        <span class="catalog-badge badge-rsa" style="background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.3);">Scope Gated &amp; Responsible</span>
+      </div>
+      <div class="catalog-desc">
+        Operational framework conforming to AGENTS.md: Mandatory 3-factor scope gatekeeping (program, URL, in-scope quote), live artifact audit (JWT alg:none, RS256/HS256 key confusion, weak secret cracking, session token PRNG &amp; MT19937 timestamp seeding, ECB cookie leakage, GCM nonce reuse, TLS key audits), and 10-point responsible disclosure writeups with CVSS v3.1 vector calculation and CWE mappings.
+      </div>
+      <div class="catalog-tags">
+        <span class="catalog-tag">Mandatory Scope Gate</span>
+        <span class="catalog-tag">JWT alg:none Bypass</span>
+        <span class="catalog-tag">RS256/HS256 Confusion</span>
+        <span class="catalog-tag">Weak Secret Cracking</span>
+        <span class="catalog-tag">MT19937 Token Seeding</span>
+        <span class="catalog-tag">ECB Pattern Leakage</span>
+        <span class="catalog-tag">GCM Nonce Reuse</span>
+        <span class="catalog-tag">CVSS v3.1 &amp; CWE</span>
+        <span class="catalog-tag">10-Point Disclosure Writeup</span>
       </div>
     </div>
 
@@ -1859,7 +2026,8 @@ function setBusy(v){
 
 btnSubmit.addEventListener('click', async () => {
   const text = ta.value.trim();
-  if (!text && uploadedFiles.length === 0) {
+  const bountyVal = document.getElementById('bounty-url')?.value?.trim() || '';
+  if (!text && uploadedFiles.length === 0 && !bountyVal) {
     ta.focus();
     ta.style.borderColor='rgba(244,63,94,.5)';
     setTimeout(()=>ta.style.borderColor='',2000);
@@ -1871,6 +2039,8 @@ btnSubmit.addEventListener('click', async () => {
   terminal.innerHTML = '';
   resultCard.style.display = 'none';
   document.getElementById('hash-card').style.display = 'none';
+  const bountyCard = document.getElementById('bounty-card');
+  if (bountyCard) bountyCard.style.display = 'none';
   ['s-classify','s-generate','s-execute','s-result'].forEach(id => {
     const el = document.getElementById(id);
     el.classList.remove('active','done');
@@ -1897,6 +2067,9 @@ btnSubmit.addEventListener('click', async () => {
   const ncVal = document.getElementById('nc-target')?.value?.trim();
   if (ncVal) {
     fd.append('nc_target', ncVal);
+  }
+  if (bountyVal) {
+    fd.append('bounty_url', bountyVal);
   }
   uploadedFiles.forEach(f => {
     fd.append('challenge_files', f);
@@ -2143,12 +2316,37 @@ function showResult(msg) {
         setTimeout(() => repCopyBtn.textContent = 'Copy Report', 1800);
       };
     }
+    const writeupBtn = document.getElementById('writeup-export-btn');
+    if (writeupBtn) {
+      writeupBtn.onclick = async () => {
+        writeupBtn.textContent = 'Exporting…';
+        try {
+          const res = await fetch('/api/export_writeup', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({report: msg.solution_report, title: selectedCategory() || 'CTF Challenge'})
+          });
+          const d = await res.json();
+          if (d.status === 'ok') {
+            writeupBtn.textContent = 'Saved writeup.md!';
+            setTimeout(() => writeupBtn.textContent = 'Export Writeup (.md)', 2200);
+          } else {
+            writeupBtn.textContent = 'Export Failed';
+          }
+        } catch(e) {
+          writeupBtn.textContent = 'Error';
+        }
+      };
+    }
   } else if (reportViewer) {
     reportViewer.style.display = 'none';
   }
 
   // ── Hash / Encoding Analysis Card ───────────────────────────────────────
   if (msg.hash_info) showHashCard(msg.hash_info);
+
+  // ── Bug Bounty Target Audit Card ─────────────────────────────────────────
+  if (msg.bug_bounty_info && msg.bug_bounty_info.result) showBountyCard(msg.bug_bounty_info.result);
 }
 
 function showFailed(msg) {
@@ -2278,6 +2476,151 @@ function showHashCard(hi) {
 
   inner.innerHTML = html;
 }
+
+/* ── Bug Bounty Target Audit Card renderer ─────────────────────────────────── */
+function showBountyCard(data) {
+  const card = document.getElementById('bounty-card');
+  const inner = document.getElementById('bounty-card-inner');
+  const sub = document.getElementById('bounty-card-sub');
+  const gradeBadge = document.getElementById('bounty-grade-badge');
+  const repBtn = document.getElementById('bounty-report-btn');
+
+  if (!data) return;
+  card.style.display = 'block';
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  // Grade color
+  const grade = data.grade || '?';
+  gradeBadge.textContent = 'Grade: ' + grade;
+  if (grade === 'A') {
+    gradeBadge.style.background = 'rgba(16,185,129,.2)';
+    gradeBadge.style.color = '#6ee7b7';
+    gradeBadge.style.borderColor = 'rgba(16,185,129,.4)';
+  } else if (grade === 'B') {
+    gradeBadge.style.background = 'rgba(6,182,212,.2)';
+    gradeBadge.style.color = '#67e8f9';
+    gradeBadge.style.borderColor = 'rgba(6,182,212,.4)';
+  } else if (grade === 'C') {
+    gradeBadge.style.background = 'rgba(234,179,8,.2)';
+    gradeBadge.style.color = '#fde047';
+    gradeBadge.style.borderColor = 'rgba(234,179,8,.4)';
+  } else {
+    gradeBadge.style.background = 'rgba(239,68,68,.2)';
+    gradeBadge.style.color = '#fca5a5';
+    gradeBadge.style.borderColor = 'rgba(239,68,68,.4)';
+  }
+
+  const fCount = data.findings_count || (data.findings ? data.findings.length : 0);
+  sub.textContent = `${data.url || 'Target'} · ${fCount} security finding(s)`;
+
+  if (data.bug_bounty_report) {
+    repBtn.style.display = 'inline-block';
+    repBtn.onclick = () => {
+      const reportViewer = document.getElementById('report-viewer');
+      const reportText = document.getElementById('report-text');
+      if (reportViewer && reportText) {
+        reportText.textContent = data.bug_bounty_report;
+        reportViewer.style.display = 'block';
+        reportViewer.scrollIntoView({behavior:'smooth', block:'nearest'});
+      }
+    };
+  } else {
+    repBtn.style.display = 'none';
+  }
+
+  let html = `
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center;">
+      <span class="sum-pill" style="border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.04);color:var(--text-1);">
+        Target: <b style="font-family:'JetBrains Mono',monospace;">${esc(data.url || '')}</b>
+      </span>
+      <span class="sum-pill" style="border:1px solid rgba(148,163,184,.2);background:rgba(255,255,255,.04);color:var(--text-2);">
+        Status: <b>${data.status_code || 'N/A'}</b>
+      </span>
+      <span class="sum-pill" style="${data.scope_gate?.allowed ? 'border:1px solid rgba(16,185,129,.3);color:#6ee7b7;background:rgba(16,185,129,.08);' : 'border:1px solid rgba(239,68,68,.3);color:#fca5a5;background:rgba(239,68,68,.08);'}">
+        ${data.scope_gate?.allowed ? '✅ Scope Confirmed' : '⚠️ Scope Unverified'}
+      </span>
+      ${data.tls_info?.tls_version ? `<span class="sum-pill" style="border:1px solid rgba(6,182,212,.3);color:#67e8f9;background:rgba(6,182,212,.08);">TLS: ${esc(data.tls_info.tls_version)}</span>` : ''}
+    </div>
+  `;
+
+  // Severity pills summary
+  const sm = data.severity_summary || {};
+  html += `
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px;">
+      <span class="bounty-sev-badge bounty-sev-CRITICAL">Critical: ${sm.CRITICAL || 0}</span>
+      <span class="bounty-sev-badge bounty-sev-HIGH">High: ${sm.HIGH || 0}</span>
+      <span class="bounty-sev-badge bounty-sev-MEDIUM">Medium: ${sm.MEDIUM || 0}</span>
+      <span class="bounty-sev-badge bounty-sev-LOW">Low: ${sm.LOW || 0}</span>
+      <span class="bounty-sev-badge bounty-sev-INFO">Info: ${sm.INFO || 0}</span>
+    </div>
+  `;
+
+  // Findings list
+  const findings = data.findings || [];
+  if (findings.length === 0) {
+    html += `<div style="color:var(--emerald);font-size:13px;padding:12px;background:rgba(16,185,129,.05);border-radius:var(--radius-sm);border:1px solid rgba(16,185,129,.2);">
+      ✅ No immediate cryptographic or transport security vulnerabilities detected on endpoint.
+    </div>`;
+  } else {
+    findings.forEach((f) => {
+      const sev = (f.severity || 'LOW').toUpperCase();
+      html += `
+        <div class="bounty-finding-item">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="bounty-sev-badge bounty-sev-${sev}">${sev}</span>
+              <span style="font-weight:700;font-size:13px;color:var(--text-1);">${esc(f.title || '')}</span>
+            </div>
+            ${f.cwe ? `<span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text-3);">${esc(f.cwe)}</span>` : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text-2);line-height:1.5;">${esc(f.description || '')}</div>
+          ${f.poc_token ? `<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--cyan-l);background:rgba(0,0,0,.3);padding:4px 8px;border-radius:4px;word-break:break-all;">PoC Token: ${esc(f.poc_token)}</div>` : ''}
+          ${f.secret ? `<div style="margin-top:6px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--emerald);background:rgba(0,0,0,.3);padding:4px 8px;border-radius:4px;">Cracked Secret: <b>${esc(f.secret)}</b></div>` : ''}
+        </div>
+      `;
+    });
+  }
+
+  inner.innerHTML = html;
+}
+
+// ── Instant Bug Bounty URL Audit button listener ───────────────────────────
+document.getElementById('btn-audit-bounty')?.addEventListener('click', async () => {
+  const url = document.getElementById('bounty-url')?.value?.trim();
+  if (!url) {
+    const input = document.getElementById('bounty-url');
+    input.focus();
+    input.style.borderColor = 'rgba(244,63,94,.8)';
+    setTimeout(() => input.style.borderColor = '', 2000);
+    return;
+  }
+  const prog = document.getElementById('bounty-program')?.value?.trim() || '';
+  const scope = document.getElementById('bounty-scope')?.value?.trim() || '';
+  const btn = document.getElementById('btn-audit-bounty');
+  const oldText = btn.textContent;
+  btn.textContent = 'Auditing…';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/api/bug_bounty/audit_url', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url: url, program_name: prog, in_scope_line: scope})
+    });
+    const d = await res.json();
+    if (d.error) {
+      alert('Audit Error: ' + d.error);
+    } else {
+      showBountyCard(d);
+    }
+  } catch(e) {
+    alert('Request failed: ' + e.message);
+  } finally {
+    btn.textContent = oldText;
+    btn.disabled = false;
+  }
+});
+
 </script>
 </body>
 </html>

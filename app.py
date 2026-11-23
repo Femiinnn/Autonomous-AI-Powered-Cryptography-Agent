@@ -86,8 +86,11 @@ def solve():
     category       = request.form.get('category', 'auto').strip()
     attack         = request.form.get('attack', 'auto').strip()
     nc_target      = request.form.get('nc_target', '').strip()
+    bounty_url     = request.form.get('bounty_url', '').strip()
     if nc_target:
         challenge_text = (challenge_text + f"\n[Remote Netcat Target: {nc_target}]").strip()
+    if bounty_url:
+        challenge_text = (challenge_text + f"\n[Bug Bounty Target URL: {bounty_url}]").strip()
 
     # ── Handle uploaded files with 16-point Defense-in-Depth Security ─────────
     files_list = request.files.getlist('challenge_files')
@@ -337,6 +340,13 @@ def solve():
                 'methods_checked': ma.get('methods_checked', [])
             }
 
+            # ── Bug Bounty Analysis ──────────────────────────────────────────
+            bba = result.get('bug_bounty_analysis') or {}
+            bug_bounty_info = {
+                'artifact_type': bba.get('artifact_type', ''),
+                'result': bba.get('result', {})
+            }
+
             q.put({
                 'type': 'result',
                 'decoded_result': decoded_result,
@@ -352,6 +362,7 @@ def solve():
                 'lattice_info': lattice_info,
                 'stego_info': stego_info,
                 'math_info': math_info,
+                'bug_bounty_info': bug_bounty_info,
                 'solution_report': result.get('solution_report', ''),
                 'ranked_hypotheses': result.get('ranked_hypotheses', []),
                 'extracted_parameters': result.get('extracted_parameters', {})
@@ -654,5 +665,186 @@ def api_verify():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/symbolic_solve', methods=['POST'])
+def api_symbolic_solve():
+    """Autonomous Z3 & Pure-Python symbolic bitwise reverser for custom ciphers."""
+    data = request.get_json(silent=True) or {}
+    text = data.get('challenge', '') or request.form.get('challenge', '')
+    if not text.strip():
+        return jsonify({'error': 'Please provide challenge text containing custom cipher code/ciphertext.'}), 400
+    try:
+        from z3_symbolic_solver import analyze_and_solve_custom_cipher
+        res = analyze_and_solve_custom_cipher(text)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/interactive_probe', methods=['POST'])
+def api_interactive_probe():
+    """Probe and automate interactive netcat/TCP service oracles."""
+    data = request.get_json(silent=True) or {}
+    target = data.get('target', '') or request.form.get('target', '')
+    if not target.strip():
+        return jsonify({'error': 'Please provide target host:port or nc command.'}), 400
+    try:
+        from interactive_oracle_engine import probe_and_solve_remote_service
+        res = probe_and_solve_remote_service(target)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/benchmark', methods=['GET', 'POST'])
+def api_benchmark():
+    """Runs the 16-discipline cryptanalysis evaluation benchmark and returns summary."""
+    try:
+        from eval_benchmark import run_benchmark_suite
+        res = run_benchmark_suite()
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/export_writeup', methods=['POST'])
+def api_export_writeup():
+    """Exports structured CTF challenge writeup in Markdown."""
+    data = request.get_json(silent=True) or {}
+    report = data.get('report', '')
+    title = data.get('title', 'CTF Cryptographic Challenge')
+    if not report.strip():
+        out_file = app.config['OUTPUTS_FOLDER'] / 'solution_report.txt'
+        if out_file.exists():
+            report = out_file.read_text(encoding='utf-8')
+    try:
+        from verification_engine import export_ctf_writeup
+        md = export_ctf_writeup(report, challenge_name=title, output_file=str(app.config['OUTPUTS_FOLDER'] / 'writeup.md'))
+        return jsonify({'status': 'ok', 'writeup_markdown': md, 'path': 'outputs/writeup.md'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+# ── Bug Bounty Cryptographic Endpoints (AGENTS.md) ──────────────────────────
+
+@app.route('/api/bug_bounty/scope_check', methods=['POST'])
+def api_bug_bounty_scope_check():
+    """Enforces the 3 mandatory scope gates before touching any remote target."""
+    data = request.get_json(silent=True) or {}
+    target = data.get('target', '')
+    program_name = data.get('program_name', '')
+    program_url = data.get('program_url', '')
+    in_scope_line = data.get('in_scope_line', '')
+    prohibited_actions = data.get('prohibited_actions', [])
+    intended_action = data.get('intended_action', '')
+    try:
+        from bug_bounty_crypto import ScopeGatekeeper
+        gate = ScopeGatekeeper.validate_scope(
+            target=target,
+            program_name=program_name,
+            program_url=program_url,
+            in_scope_line=in_scope_line,
+            prohibited_actions=prohibited_actions,
+            intended_action=intended_action
+        )
+        return jsonify({
+            'allowed': gate.allowed,
+            'target_type': gate.target_type,
+            'reason': gate.reason,
+            'warnings': gate.warnings,
+            'missing_fields': gate.missing_fields
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bug_bounty/analyze_artifact', methods=['POST'])
+def api_bug_bounty_analyze_artifact():
+    """Audits live artifacts (JWT, cookies, session tokens, ciphertexts, TLS certs)."""
+    data = request.get_json(silent=True) or {}
+    artifact = data.get('artifact', '')
+    artifact_type = data.get('artifact_type', 'auto')
+    endpoint = data.get('target_endpoint', 'https://target.com/api')
+    if not artifact.strip():
+        return jsonify({'error': 'No artifact provided'}), 400
+    try:
+        from bug_bounty_crypto import audit_bug_bounty_artifact
+        res = audit_bug_bounty_artifact(artifact, artifact_type=artifact_type, target_endpoint=endpoint)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bug_bounty/jwt_audit', methods=['POST'])
+def api_bug_bounty_jwt_audit():
+    """Detailed JWT security audit for alg:none, key confusion, and secret cracking."""
+    data = request.get_json(silent=True) or {}
+    token = data.get('token', '')
+    public_key = data.get('public_key_pem', None)
+    if not token.strip():
+        return jsonify({'error': 'No JWT token provided'}), 400
+    try:
+        from bug_bounty_crypto import JWTAuditor
+        res = JWTAuditor.audit_token(token, public_key_pem=public_key)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bug_bounty/generate_report', methods=['POST'])
+def api_bug_bounty_generate_report():
+    """Generates a 10-point responsible disclosure bug bounty report in Markdown."""
+    data = request.get_json(silent=True) or {}
+    title = data.get('title', 'Cryptographic Implementation Vulnerability')
+    affected_asset = data.get('affected_asset', 'https://target.com')
+    finding_type = data.get('finding_type', 'ALG_NONE_ACTIVE')
+    root_cause = data.get('root_cause', 'Cryptographic flaw detected.')
+    reproduction_steps = data.get('reproduction_steps', ['Step 1: Inspect token', 'Step 2: Verify flaw'])
+    evidence = data.get('evidence', '[REDACTED]')
+    impact = data.get('impact', 'Potential authentication bypass.')
+    suggested_fix = data.get('suggested_fix', 'Upgrade cryptographic libraries.')
+    program_sla = data.get('program_sla', 'Standard 90-day responsible disclosure window')
+    try:
+        from bug_bounty_crypto import BugBountyReportGenerator
+        rep = BugBountyReportGenerator.generate_report(
+            title=title,
+            affected_asset=affected_asset,
+            finding_type=finding_type,
+            root_cause=root_cause,
+            reproduction_steps=reproduction_steps,
+            evidence=evidence,
+            impact=impact,
+            suggested_fix=suggested_fix,
+            program_sla=program_sla
+        )
+        return jsonify({'status': 'ok', 'report': rep})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/bug_bounty/audit_url', methods=['POST'])
+def api_bug_bounty_audit_url():
+    """Passively audits a live target URL for cryptographic and implementation flaws."""
+    data = request.get_json(silent=True) or {}
+    url = data.get('url', '').strip()
+    program_name = data.get('program_name', '').strip()
+    in_scope_line = data.get('in_scope_line', '').strip()
+    program_url = data.get('program_url', '').strip()
+    if not url:
+        return jsonify({'error': 'No URL provided'}), 400
+    try:
+        from bug_bounty_crypto import audit_target_url
+        res = audit_target_url(
+            target_url=url,
+            program_name=program_name,
+            in_scope_line=in_scope_line,
+            program_url=program_url
+        )
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000, threaded=True)
+    host = os.environ.get('FLASK_HOST', '0.0.0.0')
+    port = int(os.environ.get('FLASK_PORT', 5000))
+    app.run(host=host, port=port, debug=True, threaded=True)

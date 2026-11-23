@@ -52,6 +52,8 @@ class CryptoAgentState(TypedDict):
     lattice_analysis: Optional[dict]    # full report from lattice_crypto
     stego_analysis: Optional[dict]      # full report from crypto_stego
     math_analysis: Optional[dict]       # full report from advanced_math_crypto
+    custom_analysis: Optional[dict]     # full report from z3_symbolic_solver
+    bug_bounty_analysis: Optional[dict] # full report from bug_bounty_crypto (AGENTS.md)
     extracted_parameters: Optional[dict] # autonomous parameter extraction
     ranked_hypotheses: Optional[list]    # prioritized attack vectors
     solution_report: Optional[str]       # 10-point CTF solution report
@@ -373,6 +375,71 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
             print(f"  ⚠️ Advanced math cryptanalysis error: {e}")
             math_res = {"status": "error", "error": str(e)}
 
+    # 9. Custom Bitwise & Symbolic Reverser Suite
+    custom_res = {}
+    if not verified_flag and ("def " in challenge or "<<" in challenge or ">>" in challenge or "rol" in challenge.lower() or "ror" in challenge.lower() or "feistel" in challenge.lower()):
+        print("  🧩 Custom Bitwise / Scrambler logic detected — executing Symbolic Reverser Suite…")
+        try:
+            from z3_symbolic_solver import analyze_and_solve_custom_cipher
+            custom_res = analyze_and_solve_custom_cipher(challenge)
+            if custom_res.get("status") == "solved" and custom_res.get("flag"):
+                pt = custom_res["flag"]
+                atk = custom_res.get("method", "Symbolic Preimage Inversion")
+                verified_flag = pt
+                solved_category = "Custom Bitwise / Scrambler"
+                solved_attack = atk
+                solved_code = f"# Solved directly via z3_symbolic_solver ({atk})\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED CUSTOM CIPHER FLAG RECOVERED via {atk}: {pt}")
+        except Exception as e:
+            print(f"  ⚠️ Symbolic reverser error: {e}")
+
+    # 10. Remote Netcat Socket Probing & Interactive Oracle Driver
+    if not verified_flag and ("[remote netcat target:" in challenge.lower() or "nc " in challenge.lower()):
+        try:
+            from interactive_oracle_engine import probe_and_solve_remote_service
+            socket_res = probe_and_solve_remote_service(challenge)
+            if socket_res.get("flag"):
+                pt = socket_res["flag"]
+                verified_flag = pt
+                solved_category = "Remote CTF Socket Oracle"
+                solved_attack = socket_res.get("detected_oracle_type", "Interactive Socket Probe")
+                solved_code = f"# Solved via interactive_oracle_engine\nprint('{pt}')\n"
+                print(f"  🚩 VERIFIED REMOTE SOCKET FLAG RECOVERED: {pt}")
+        except Exception as e:
+            pass
+
+    # 11. Bug Bounty Live Artifact Auditor & Scope Gatekeeper (AGENTS.md)
+    bounty_res = {}
+    is_bounty_artifact = bool(
+        re.search(r'eyJ[a-zA-Z0-9_\-]+\.eyJ[a-zA-Z0-9_\-]+', challenge)
+        or re.search(r'\b(jwt|bearer|reset.?token|session.?id|bounty|in.?scope|hackerone|bugcrowd)\b', challenge, re.IGNORECASE)
+        or "-----BEGIN CERTIFICATE" in challenge
+    )
+    if is_bounty_artifact and not verified_flag:
+        print("  🎯 Bug Bounty Artifact detected — executing Bug Bounty Cryptanalysis Suite…")
+        try:
+            from bug_bounty_crypto import audit_bug_bounty_artifact, ScopeGatekeeper
+            urls = re.findall(r'https?://[^\s\'"]+', challenge)
+            if urls:
+                scope_check = ScopeGatekeeper.validate_scope(urls[0])
+                if not scope_check.allowed:
+                    print(f"  🛑 Scope Gatekeeper Notification: {scope_check.reason}")
+
+            bounty_res = audit_bug_bounty_artifact(challenge)
+            res_inner = bounty_res.get("result", {})
+            findings = res_inner.get("findings", [])
+            if findings:
+                f0 = findings[0]
+                print(f"  🛡️ Bug Bounty Finding [{f0.get('severity', 'INFO')}]: {f0.get('title')}")
+                if f0.get("secret"):
+                    pt = f"secret:{f0['secret']}"
+                    verified_flag = pt
+                    solved_category = "Bug Bounty (Weak HMAC Secret)"
+                    solved_attack = f0["title"]
+                    solved_code = f"# Weak HMAC secret cracked via bug_bounty_crypto\nSECRET = '{f0['secret']}'\nprint('SECRET:', SECRET)\n"
+        except Exception as e:
+            print(f"  ⚠️ Bug bounty analysis error: {e}")
+
     result_dict = {
         "hash_analysis": hash_analysis,
         "classical_analysis": classical_res,
@@ -383,6 +450,8 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
         "lattice_analysis": lattice_res,
         "stego_analysis": stego_res,
         "math_analysis": math_res,
+        "custom_analysis": custom_res,
+        "bug_bounty_analysis": bounty_res,
         "extracted_parameters": extracted_params,
         "ranked_hypotheses": ranked_hypotheses,
         "solution_report": None
@@ -408,6 +477,11 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
                 complexity="O(1) Direct Cryptanalysis"
             )
             result_dict["solution_report"] = rep
+            try:
+                from verification_engine import export_ctf_writeup
+                export_ctf_writeup(rep, challenge_name=solved_category)
+            except Exception:
+                pass
         except Exception:
             pass
 
@@ -989,6 +1063,11 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
                 verified=True,
                 complexity="Polynomial"
             )
+            try:
+                from verification_engine import export_ctf_writeup
+                export_ctf_writeup(report, challenge_name=state.get("category", "CTF Challenge"))
+            except Exception:
+                pass
         except Exception as e:
             report = f"Report generation error: {e}"
     else:

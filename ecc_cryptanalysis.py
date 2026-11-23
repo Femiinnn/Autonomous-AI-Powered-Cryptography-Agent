@@ -347,10 +347,18 @@ class ECCAttacks:
     # 1. Baby-Step Giant-Step (BSGS) for ECDLP
     # ─────────────────────────────────────────────────────────────────────────
     @staticmethod
-    def attack_ecdlp_bsgs(P: ECPoint, Q: ECPoint, curve: EllipticCurve, max_scalar: int = 10_000_000) -> Optional[int]:
+    def attack_ecdlp_bsgs(arg1: Any, arg2: Any, arg3: Any = None, max_scalar: int = 10_000_000, max_steps: Optional[int] = None) -> Optional[int]:
         """
         Solves Q = d * P for d in range [0, max_scalar] using Baby-Step Giant-Step in O(sqrt(N)).
+        Accepts (P, Q, curve) or (curve, P, Q).
         """
+        if max_steps is not None:
+            max_scalar = max_steps
+
+        if isinstance(arg1, EllipticCurve):
+            curve, P, Q = arg1, arg2, arg3
+        else:
+            P, Q, curve = arg1, arg2, arg3
         if Q.is_infinity:
             return 0
         if P == Q:

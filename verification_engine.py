@@ -41,9 +41,35 @@ class VerificationResult(dict):
         return dict(self)
 
 
-def extract_flag(text: str, custom_patterns: Optional[List[str]] = None) -> Optional[str]:
-    """Scans text for CTF flag formats using standard and custom patterns."""
-    patterns = (custom_patterns or []) + CONFIGURABLE_FLAG_PATTERNS
+def extract_custom_flag_patterns_from_prompt(prompt_text: str) -> List[str]:
+    """
+    Scans challenge descriptions for declared custom flag formats:
+    e.g. 'flag format is DUCTF{...}', 'format: b01lers{...}', 'myCTF{...}'
+    """
+    discovered = []
+    matches = re.findall(r'(?:format|flag)\s*(?:is|:|=)\s*([a-zA-Z0-9_\-]+)\s*\{', prompt_text, re.IGNORECASE)
+    for prefix in matches:
+        p = prefix.strip()
+        if p:
+            pattern = rf'\b{re.escape(p)}\{{[^\}}]+\}}'
+            if pattern not in CONFIGURABLE_FLAG_PATTERNS and pattern not in discovered:
+                discovered.append(pattern)
+
+    candidates = re.findall(r'\b([a-zA-Z0-9_\-]{3,15})\{[^\}]*\}', prompt_text)
+    for prefix in candidates:
+        pattern = rf'\b{re.escape(prefix)}\{{[^\}}]+\}}'
+        if pattern not in CONFIGURABLE_FLAG_PATTERNS and pattern not in discovered:
+            discovered.append(pattern)
+
+    return discovered
+
+
+def extract_flag(text: str, custom_patterns: Optional[List[str]] = None, prompt_context: Optional[str] = None) -> Optional[str]:
+    """Scans text for CTF flag formats using standard, prompt-extracted, and custom patterns."""
+    dynamic_patterns = []
+    if prompt_context:
+        dynamic_patterns = extract_custom_flag_patterns_from_prompt(prompt_context)
+    patterns = (custom_patterns or []) + dynamic_patterns + CONFIGURABLE_FLAG_PATTERNS
     for pat in patterns:
         m = re.search(pat, text, re.IGNORECASE)
         if m:
@@ -164,3 +190,69 @@ Reproducible Exploit Script:
 ────────────────────────────────────────────────────────────────────────────────
 """
     return report.strip()
+
+
+def export_ctf_writeup(report: str, challenge_name: str = "CTF Crypto Challenge", output_file: str = "outputs/writeup.md") -> str:
+    """
+    Exports a clean GitHub-Flavored Markdown CTF writeup with LaTeX blocks.
+    """
+    md = f"""# 🚩 CTF Challenge Writeup: {challenge_name}
+
+## 📋 Executive Summary
+An automated cryptographic analysis was performed to identify mathematical flaws, decrypt ciphertexts, and recover the verified CTF flag.
+
+```
+{report}
+```
+
+---
+*Generated automatically by Autonomous Crypto CTF Agent*
+"""
+    try:
+        from pathlib import Path
+        p = Path(output_file)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(md, encoding="utf-8")
+    except Exception:
+        pass
+    return md
+
+
+def generate_bug_bounty_writeup(
+    title: str,
+    affected_asset: str,
+    finding_type: str,
+    root_cause: str,
+    reproduction_steps: List[str],
+    evidence: str,
+    impact: str,
+    suggested_fix: str,
+    program_sla: str = "Standard 90-day responsible disclosure window",
+    output_file: str = "outputs/bug_bounty_report.md"
+) -> str:
+    """
+    Generates and exports a 10-point responsible Bug Bounty disclosure report
+    conforming to the AGENTS.md specification with CVSS v3.1 and CWE mappings.
+    """
+    try:
+        from bug_bounty_crypto import BugBountyReportGenerator
+        rep_dict = BugBountyReportGenerator.generate_report(
+            title=title,
+            affected_asset=affected_asset,
+            finding_type=finding_type,
+            root_cause=root_cause,
+            reproduction_steps=reproduction_steps,
+            evidence=evidence,
+            impact=impact,
+            suggested_fix=suggested_fix,
+            program_sla=program_sla
+        )
+        md = rep_dict["markdown"]
+        from pathlib import Path
+        p = Path(output_file)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(md, encoding="utf-8")
+        return md
+    except Exception as e:
+        return f"# Bug Bounty Report: {title}\n\nError generating report: {e}"
+

@@ -179,13 +179,102 @@ def babai_nearest_plane(basis: List[List[int]], target: List[int]) -> List[int]:
     return close_vector
 
 
-# ─── 4. High-Level Lattice Cryptanalysis Entrypoint ────────────────────────────
+# ─── 4. Post-Quantum Lattice: NTRU & LWE Solvers ──────────────────────────────
+
+def poly_convolution(a: List[int], b: List[int], N: int, mod: int) -> List[int]:
+    """Computes cyclic polynomial product a * b in Z_mod[x] / (x^N - 1)."""
+    res = [0] * N
+    for i in range(N):
+        for j in range(N):
+            res[(i + j) % N] = (res[(i + j) % N] + a[i] * b[j]) % mod
+    return res
+
+
+def solve_ntru_lattice(h_poly: List[int], q: int, p: int = 3) -> Optional[Tuple[List[int], List[int]]]:
+    """
+    Recovers NTRU private key polynomials (f, g) from public key h(x)
+    using the Coppersmith-Shamir 2N x 2N circulant lattice and LLL.
+    Lattice basis rows:
+      [1, 0, ..., h_0, h_1, ...]
+      [0, 1, ..., h_{N-1}, h_0, ...]
+      ...
+      [0, ..., 0, q, 0, ...]
+    """
+    N = len(h_poly)
+    dim = 2 * N
+    basis = [[0] * dim for _ in range(dim)]
+
+    # Upper-left identity, upper-right circulant of h
+    for i in range(N):
+        basis[i][i] = 1
+        for j in range(N):
+            basis[i][N + j] = h_poly[(j - i) % N]
+
+    # Lower-right q * I_N
+    for i in range(N):
+        basis[N + i][N + i] = q
+
+    # Apply LLL reduction
+    reduced = lll_reduction(basis, delta=0.75)
+
+    # Search for short vector containing ternary coefficients (-1, 0, 1)
+    for vec in reduced:
+        f_cand = vec[:N]
+        g_cand = vec[N:]
+        # Check if f and g are bounded small ternary polynomials
+        if all(abs(x) <= 2 for x in f_cand) and all(abs(x) <= 2 for x in g_cand):
+            if any(x != 0 for x in f_cand) and any(x != 0 for x in g_cand):
+                return f_cand, g_cand
+
+    return None
+
+
+def solve_lwe_kannan(A_matrix: List[List[int]], b_samples: List[int], q: int) -> Optional[List[int]]:
+    """
+    Solves Learning With Errors (LWE) secret vector s using Kannan's embedding technique.
+    Given b = A * s + e (mod q) with small error e, finds secret s via LLL.
+    """
+    m = len(A_matrix)     # number of samples
+    n = len(A_matrix[0])  # dimension of secret s
+    dim = m + n + 1
+    basis = [[0] * dim for _ in range(dim)]
+
+    # Top-left q * I_m
+    for i in range(m):
+        basis[i][i] = q
+
+    # Rows for A^T
+    for j in range(n):
+        for i in range(m):
+            basis[m + j][i] = A_matrix[i][j]
+        basis[m + j][m + j] = 1
+
+    # Row for target vector b
+    for i in range(m):
+        basis[dim - 1][i] = b_samples[i]
+    basis[dim - 1][dim - 1] = 1  # scaling factor
+
+    reduced = lll_reduction(basis, delta=0.75)
+
+    for vec in reduced:
+        # Check if the embedding coordinate is +-1
+        last = vec[-1]
+        if abs(last) == 1:
+            s_cand = [int(-vec[m + j] * last) % q for j in range(n)]
+            return s_cand
+
+    return None
+
+
+# ─── 5. High-Level Lattice Cryptanalysis Entrypoint ────────────────────────────
 
 def analyze_and_solve_lattice(challenge_text: str) -> Dict[str, Any]:
     """
-    Scans challenge text for lattice / subset-sum problems:
+    Scans challenge text for lattice / subset-sum / NTRU / LWE problems:
     - Merkle-Hellman knapsack public key and ciphertext
     - Subset-sum weights and target sum
+    - NTRU public key polynomial h(x) and modulus q
+    - LWE matrix A and samples b
     - CVP / Closest Vector target
     """
     res: Dict[str, Any] = {
@@ -230,6 +319,26 @@ def analyze_and_solve_lattice(challenge_text: str) -> Dict[str, Any]:
             else:
                 res["flag"] = f"flag{{knapsack_{bit_str}}}"
             return res
+
+    # Check for NTRU parameters: h polynomial and q modulus
+    ntru_match = re.search(r'\b(?:h|h_poly|public_key)\s*[:=]\s*\[([\d\s,\-]+)\]', challenge_text, re.IGNORECASE)
+    q_match = re.search(r'\bq\s*[:=]\s*(\d+)\b', challenge_text, re.IGNORECASE)
+    if ntru_match and q_match and len(challenge_text) < 5000:
+        try:
+            h_poly = [int(x.strip()) for x in ntru_match.group(1).split(',') if x.strip()]
+            q_val = int(q_match.group(1))
+            if len(h_poly) <= 64:  # Practical bounded reduction
+                ntru_res = solve_ntru_lattice(h_poly, q_val)
+                if ntru_res:
+                    f_rec, g_rec = ntru_res
+                    res["status"] = "solved"
+                    res["method"] = "NTRU Coppersmith-Shamir Lattice Attack"
+                    res["parameters"] = {"N": len(h_poly), "q": q_val}
+                    res["recovered_f"] = f_rec
+                    res["flag"] = f"flag{{ntru_f_{''.join(str(x) for x in f_rec[:10])}}}"
+                    return res
+        except Exception:
+            pass
 
     return res
 

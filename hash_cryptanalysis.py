@@ -13,12 +13,70 @@ import math
 import itertools
 from typing import Dict, List, Optional, Tuple, Any
 
-# Common CTF salt/password candidate words
+# Common CTF salt/password candidate words & leetspeak variants
 COMMON_WORDLIST = [
     "admin", "password", "123456", "root", "toor", "guest", "test",
     "letmein", "welcome", "shadow", "master", "crypto", "secret",
-    "flag", "ctf", "pico", "hack", "cyber", "pass123", "default"
+    "flag", "ctf", "pico", "hack", "cyber", "pass123", "default",
+    "12345678", "123456789", "qwerty", "dragon", "111111", "baseball",
+    "football", "access", "hunter2", "login", "server", "system",
+    "administrator", "superadmin", "operator", "security", "passphrase",
+    "crypto123", "p@ssword", "fl@g", "c7f", "s3cr3t", "h@ck3r", "sup3r",
+    "flag{easy}", "flag{test}", "flag{admin}", "picoCTF{test}", "challenge",
+    "0000", "1234", "admin1", "admin123", "iloveyou", "princess", "monkey"
 ]
+
+_PRECOMPUTED_CACHE: Dict[str, Dict[str, str]] = {}
+
+
+def get_precomputed_hash_cache(algo: str = "md5") -> Dict[str, str]:
+    """Builds and caches hash -> plaintext lookup table for instant O(1) cracking."""
+    algo = algo.lower()
+    if algo in _PRECOMPUTED_CACHE:
+        return _PRECOMPUTED_CACHE[algo]
+
+    table: Dict[str, str] = {}
+    for word in COMMON_WORDLIST:
+        for variant in [word, word.upper(), word.capitalize(), word + "123", word + "!", word + "2024"]:
+            h = compute_hash(algo, variant.encode())
+            if h:
+                table[h.lower()] = variant
+
+    _PRECOMPUTED_CACHE[algo] = table
+    return table
+
+
+def salted_hash_attack(
+    target_hash: str,
+    salt: str,
+    algo: str = "sha256",
+    salt_position: str = "prefix",
+    wordlist: Optional[List[str]] = None
+) -> CrackResult:
+    """Attempts recovery of salted hash (salt || password or password || salt)."""
+    target_hash = target_hash.strip().lower()
+    words = (wordlist or []) + COMMON_WORDLIST
+
+    for w in words:
+        for cand in [w, w.upper(), w.capitalize(), w + "123"]:
+            payload = (salt + cand) if salt_position == "prefix" else (cand + salt)
+            h = compute_hash(algo, payload.encode())
+            if h.lower() == target_hash:
+                return CrackResult({
+                    "status": "cracked",
+                    "plaintext": cand,
+                    "salt": salt,
+                    "salt_position": salt_position,
+                    "hash": target_hash,
+                    "algo": algo
+                })
+
+    return CrackResult({
+        "status": "failed",
+        "plaintext": None,
+        "hash": target_hash,
+        "algo": algo
+    })
 
 HASH_SPECS = {
     "md5":      {"len_hex": 32,  "bits": 128, "md_construction": True,  "block_size": 64},
@@ -89,6 +147,20 @@ def compute_hash(arg1: Any, arg2: Any) -> str:
 def dictionary_attack(target_hash: str, algo: str, wordlist: Optional[List[str]] = None) -> CrackResult:
     """Attempts fast wordlist and targeted variation lookup."""
     target_hash = target_hash.strip().lower()
+    algo = algo.lower()
+
+    # O(1) precomputed cache lookup
+    if wordlist is None:
+        cached = get_precomputed_hash_cache(algo)
+        if target_hash in cached:
+            return CrackResult({
+                "status": "cracked",
+                "plaintext": cached[target_hash],
+                "hash": target_hash,
+                "algo": algo,
+                "cached": True
+            })
+
     words = (wordlist or []) + COMMON_WORDLIST
     variations = []
 

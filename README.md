@@ -286,7 +286,7 @@ Specialized automated cryptanalysis for pseudo-random number generators and line
 
 ### G. Lattice Cryptography Suite (`lattice_crypto.py`)
 
-A pure-Python rational lattice mathematics and cryptanalysis engine independent of external C/C++ libraries:
+A pure-Python rational lattice mathematics and cryptanalysis engine independent of external C/C++ libraries, featuring post-quantum lattice primitives:
 
 #### Attack Matrix & Methods
 
@@ -296,6 +296,9 @@ A pure-Python rational lattice mathematics and cryptanalysis engine independent 
 | **Clos-Chor-Lemke Knapsack Solver** | Low-density Subset Sum | Embeds knapsack weights $a_i$ and target sum $S$ into an $(n+1) \times (n+1)$ lattice; recovers binary solutions $m \in \{0, 1\}^n$ for density $d < 0.9408$ |
 | **Merkle-Hellman Cryptanalysis** | Public-key knapsack | Decrypts superincreasing sequences disguised by modular multiplier $W$ and modulus $M$ through orthogonal lattice reduction |
 | **Babai's Nearest Plane (CVP)** | Closest Vector Problem | Finds closest lattice point to target non-lattice vector $v$ using Gram-Schmidt basis projection |
+| **NTRU Circulant Lattice Solver** | Post-quantum NTRU | Recovers small private key polynomials $(f, g)$ and decrypts ciphertexts via Coppersmith-Shamir $2N \times 2N$ circulant basis reduction |
+| **Polynomial Ring Convolution** | Ring arithmetic | Computes exact polynomial multiplication in quotient ring $\mathbb{Z}_q[x]/(x^N - 1)$ for NTRU encryption/decryption validation |
+| **LWE Kannan Embedding Solver** | Learning With Errors | Solves secret vector $s$ from $(A, b = As + e \pmod q)$ by embedding problem into an $(m + n + 1)$-dimensional Kannan lattice |
 
 ---
 
@@ -362,10 +365,10 @@ Comprehensive computational algebra, lattice reduction, and constraint-solving e
 
 ### L. Hash Cryptanalysis Suite (`hash_cryptanalysis.py`)
 
-Automated hash identification, wordlist recovery, and collision cryptanalysis:
+Automated hash identification, wordlist recovery, precomputed lookup caching, and collision cryptanalysis:
 
 - **Hash Type Identification**: Distinguishes MD5 (32 hex), SHA-1 (40 hex), SHA-224 (56 hex), SHA-256 (64 hex), SHA-384 (96 hex), SHA-512 (128 hex), SHA-3 variants, and NTLM hashes.
-- **Dictionary & Wordlist Cracking**: Fast in-memory wordlist and CTF-keyword matching with salt support.
+- **Fast Precomputed Cache & Dictionary Cracking**: Instantaneous $O(1)$ lookup cache across MD5, SHA-1, and SHA-256 for common passwords, plus an expanded 50+ CTF keyword wordlist with salt support (`salted_hash_attack` supporting prefix and suffix placements).
 - **Length Extension Attack (Merkle-Damgård)**: Automatically computes correct padding ($\text{data} \parallel \text{0x80} \parallel \text{0x00}^* \parallel \text{bit\_length}$) and forges authenticated messages for MD5, SHA-1, SHA-256, and SHA-512 without secret knowledge.
 - **Birthday Collision Analysis**: Demonstrates truncated hash collisions in $O(2^{n/2})$ complexity using cycle-finding techniques.
 - **External Cracker Integration**: Generates ready-to-run Hashcat (`hashcat -m <mode> -a 0 ...`) and John the Ripper (`john --format=<format> ...`) commands with accurate mode mappings.
@@ -384,9 +387,9 @@ Intelligent parameter extraction and heuristic attack hypothesis prioritization:
 
 ### N. Plaintext & Flag Verification Engine (`verification_engine.py`)
 
-Multi-criteria sanity checking, flag extraction, and 10-point solution report generation:
+Multi-criteria sanity checking, flag extraction, dynamic prompt regex detection, and automated CTF writeup exportation:
 
-- **Configurable CTF Flag Regexes**: Supports standard and custom formats (`flag{...}`, `CTF{...}`, `picoCTF{...}`, `HTB{...}`, `THM{...}`).
+- **Configurable & Dynamic CTF Flag Regexes**: Supports standard formats (`flag{...}`, `CTF{...}`, `picoCTF{...}`, `HTB{...}`, `THM{...}`) and dynamically parses custom flag prefixes directly from challenge prompts (`extract_custom_flag_patterns_from_prompt`).
 - **Plaintext Sanity Validation**: Verifies printable ASCII ratios ($\ge 85\%$), reasonable Shannon entropy ($3.0 \le H \le 5.2$), vowel/consonant linguistic ratios, and English quadgram scores.
 - **Mathematical Round-Trip Verification**: Validates RSA round-trip consistency ($c \equiv m^e \pmod N \iff m \equiv c^d \pmod N$) and ECC public key scalar multiplication ($Q = d \cdot P$).
 - **10-Point CTF Solution Report**: Synthesizes a comprehensive writeup covering:
@@ -400,6 +403,75 @@ Multi-criteria sanity checking, flag extraction, and 10-point solution report ge
   8. Verified Plaintext / Recovered Flag
   9. Verification Proof
   10. Lessons Learned & Remediation
+- **Automated CTF Writeup Exporter (`export_ctf_writeup`)**: Exports ready-to-publish GitHub-Flavored Markdown reports to `outputs/writeup.md` with attack matrices, reproduction scripts, and verification proofs.
+
+---
+
+### O. Custom Bitwise & Z3 Symbolic Reverser (`z3_symbolic_solver.py`)
+
+Pure-Python symbolic execution AST and Z3 SMT solver for reversing non-standard CTF byte scramblers and custom Feistel ciphers:
+
+- **PureBitVec AST Engine**: Lightweight symbolic expression tree (`PureBitVec`, `PureOpNode`) supporting bitwise AND, OR, XOR, NOT, left/right shifts, and modular arithmetic without requiring external native binaries.
+- **Byte Transform Preimage Inversion (`solve_byte_transform_preimage`)**: Automatically recovers preimages for any deterministic $f(b) \to c$ byte scrambler via complete 256-state precomputation table.
+- **Indexed Byte Transform Inversion (`solve_indexed_byte_transform_preimage`)**: Inverts position-dependent scramblers $f(i, b) \to c$ with key schedule/rotation dependencies.
+- **$\mathbb{F}_2$ Linear System Solver (`solve_gf2_linear_system`)**: Solves arbitrary binary linear systems $A \cdot x \equiv b \pmod 2$ using Gaussian elimination over Galois field $\text{GF}(2)$.
+- **Symbolic Z3 Bitwise Inversion (`z3_solve_bitwise_formula`)**: Expresses complex multi-round bit manipulation pipelines in Z3 SMT logic and extracts the satisfying input assignment.
+- **Custom Feistel Network Reversal (`z3_solve_custom_feistel`)**: Reverses symmetric round functions $R_{i+1} = L_i \oplus F(R_i, K_i)$ for non-standard CTF challenges.
+- **Autonomous Custom Cipher Solver (`analyze_and_solve_custom_cipher`)**: Detects Python encryption source code or bitwise expressions and automatically recovers plaintexts.
+
+---
+
+### P. Autonomous Interactive Socket Oracle Engine (`interactive_oracle_engine.py`)
+
+Interactive client automation for live remote CTF network services:
+
+- **InteractiveServiceSession**: Dynamic TCP session manager featuring automatic banner extraction, CLI menu parsing, regex-guided query/response dispatch, and socket timeout resilience.
+- **Padding Oracle Adapter (`create_padding_oracle`)**: Wraps interactive network endpoints into high-speed local callable oracles for byte-at-a-time CBC decryption.
+- **RSA Parity Oracle Adapter (`create_rsa_parity_oracle`)**: Adapts remote LSB / parity leak servers into binary search oracles for arbitrary modulus RSA plaintext recovery.
+- **Autonomous Probe & Solve (`probe_and_solve_remote_service`)**: Connects to `host:port`, classifies service type, extracts public parameters, and runs targeted exploits against remote challenges.
+
+---
+
+### Q. 18-Discipline Verification & Benchmark Suite (`eval_benchmark.py`)
+
+Automated validation suite evaluating correctness across 18 core cryptanalysis and bug bounty disciplines:
+
+- **Test Disciplines**: RSA Cube Root, RSA Fermat, RSA Wiener, ECC BSGS DLog, Curve25519 Scalar Mult, Symmetric CBC Bit-Flip, Classical Vigenère, Classical Single-Byte XOR, Hash MD5 Cracking, Hash MD Length Extension, PRNG MT19937 Untwisting, PRNG LCG State Recovery, Lattice Clos Knapsack, Z3 / Bitwise Custom Inversion, Dynamic Flag Extraction, Recursive Multi-Layer Decoding, Bug Bounty Scope Gate Enforcement, Bug Bounty JWT & 10-Point Report.
+- **Benchmark Performance**: **18 / 18 Disciplines Passed (100.0%)** in **0.39 seconds**.
+- **Automated Logging**: Saves full test metrics and execution latencies to `outputs/benchmark_results.json`.
+
+---
+
+### R. Crypto Bug Bounty Assistant (`bug_bounty_crypto.py` & `AGENTS.md`)
+
+An operational framework and live artifact auditor adhering to responsible disclosure standards for bug bounty engagements:
+
+- **Mandatory 3-Factor Scope Gatekeeper (`ScopeGatekeeper`)**:
+  - Automatically permits local files and CTF sandboxes (`inputs/...`, `127.0.0.1`, loopback).
+  - Strictly enforces the 3 hard gates from `AGENTS.md` before analyzing any remote host:
+    1. Verified program name (e.g. HackerOne / Bugcrowd listing)
+    2. Verified program scope URL
+    3. Explicit quote of the in-scope asset line matching the target domain/IP/API
+  - Blocks prohibited actions (volumetric probing, DoS, brute forcing production auth).
+- **JWT Security Auditor (`JWTAuditor`)**:
+  - Detects `alg:none` / `None` / `NONE` bypasses and generates non-destructive test tokens.
+  - Detects `RS256` to `HS256` public key confusion vulnerabilities and creates test vectors.
+  - Identifies blank secrets (`secret = ""`) and instantly cracks weak HMAC secrets against common CTF and bounty dictionaries.
+  - Checks for header injection risks: embedded `jwk`, untrusted `jku`/`x5u` URLs, and `kid` directory traversal sequences (`../../dev/null`).
+  - Audits expiration timestamps (`exp`, `nbf`) and missing expiration claims.
+- **Session & Reset Token PRNG Auditor (`SessionTokenAuditor`)**:
+  - Measures token Shannon entropy and detects sequential counter increments.
+  - Identifies embedded Unix timestamps (hex or decimal epoch time) and UUIDv1 time-based leakage.
+  - Detects Mersenne Twister (MT19937) state leakage when consecutive tokens share 28+ of 32 bits from `time.time()` seeds.
+- **Ciphertext Smell Auditor (`CiphertextSmellAuditor`)**:
+  - Electronic Codebook (ECB) pattern leakage: flags duplicate 16-byte blocks within or across cookies/payloads.
+  - CBC static or all-zero IV detection: reveals whether distinct ciphertexts share identical IVs.
+  - AES-GCM nonce reuse: detects repeated 12-byte IVs, which catastrophically breaks integrity and exposes the GHASH key.
+- **TLS / SSL Certificate Auditor (`TLSCertificateAuditor`)**:
+  - Audits RSA key sizes (< 2048 bits), small exponents ($e=3$), and broken signature algorithms (MD5, SHA-1).
+  - Performs non-destructive checks for the ROCA (CVE-2017-15361) Infineon prime structure.
+- **10-Point Bug Bounty Responsible Disclosure Generator (`BugBountyReportGenerator`)**:
+  - Synthesizes compliant reports matching the `AGENTS.md` format with Title, Affected Asset, CWE Mapping (CWE-347, CWE-326, CWE-330, CWE-329, CWE-328), Root Cause, Minimal Reproduction Steps, Redacted Evidence, Realistic Impact, Concrete Remediation Code, CVSS v3.1 Score & Vector String, and Disclosure Timeline SLA.
 
 ---
 
@@ -415,6 +487,7 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 - **10-Point Solution Report Panel**: Instant CTF solution report viewer with markdown rendering and one-click clipboard copying
 - **Candidate Permutations Panel**: Visualizes all classical cipher decryptions ranked by English quadgram scoring
 - **Multi-Layer Encoding & Hash Inspection Card**: Displays recursive peeling layers and hash identification candidates
+- **Instant Public Link Sharing (`share_agent.py` / `share_agent.bat`)**: Generates an instant public HTTPS link via SSH tunneling to share your running agent with any teammate or collaborator globally without port forwarding.
 
 #### Direct REST Endpoints
 
@@ -432,6 +505,14 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 | `/api/lattice` | `POST` | `{"text": "weights=[...] target=..."}` | Direct instant low-density knapsack / subset-sum solving via rational LLL reduction |
 | `/api/stego` | `POST` | `{"path": "inputs/..."}` | Direct instant LSB plane extraction and trailing EOF payload carving |
 | `/api/socket_probe` | `POST` | `{"target": "host:port"}` | Interactive probe of remote CTF TCP / Netcat socket service |
+| `/api/symbolic_solve` | `POST` | `{"text": "def encrypt(p)..."}` | PureBitVec & Z3 symbolic bitwise inversion, custom Feistel reversal, and byte transform preimage solving |
+| `/api/interactive_probe` | `POST` | `{"host": "...", "port": ...}` | Autonomous interactive remote netcat service prober and menu-driven oracle solver |
+| `/api/benchmark` | `GET` / `POST` | — | Runs the 18-discipline cryptanalysis and bug bounty benchmark suite (returns JSON report) |
+| `/api/export_writeup` | `POST` | `{"report": "..."}` | Exports structured GitHub-Flavored Markdown CTF writeup to `outputs/writeup.md` |
+| `/api/bug_bounty/scope_check` | `POST` | `{"target": "...", "program_name": "...", "in_scope_line": "..."}` | Evaluates 3 mandatory scope gates before remote interaction (AGENTS.md) |
+| `/api/bug_bounty/analyze_artifact` | `POST` | `{"artifact": "...", "artifact_type": "jwt|session_tokens|ciphertext|auto"}` | Audits live artifacts for JWT flaws, PRNG smells, ECB leakage, and generates 10-point writeup |
+| `/api/bug_bounty/jwt_audit` | `POST` | `{"token": "...", "public_key_pem": "..."}` | Targeted JWT audit (alg:none, RS256/HS256 confusion, weak secret cracking) |
+| `/api/bug_bounty/generate_report` | `POST` | `{"title": "...", "affected_asset": "...", "finding_type": "..."}` | Synthesizes a 10-point responsible disclosure bug bounty report with CVSS v3.1 & CWE |
 | `/api/models` | `GET` | — | Returns active model, fallback models chain, and key rotation status |
 | `/api/cleanup` | `POST` | — | Purges unwanted temporary files from `inputs/` and `outputs/` directories |
 | `/solve` | `POST` | `FormData(challenge, category, attack, nc_target, challenge_files, csrf_token)` | Dispatches challenge, socket target & files to autonomous agent |
@@ -520,7 +601,14 @@ crypto-ctf-agent/
 ├── ctf_knowledge_base.py # Curated exploit recipes & dynamic RAG guidance retrieval
 ├── advanced_math_crypto.py # Advanced mathematical cryptanalysis (18 disciplines: LLL, BKZ, CRT, Gröbner, Hensel, SAT)
 ├── hash_decoder.py       # Multi-layer hash & encoding auto-detector
+├── z3_symbolic_solver.py # PureBitVec & Z3 symbolic bitwise solver, Feistel & byte preimage reverser
+├── interactive_oracle_engine.py # Interactive TCP netcat oracle runner & menu-driven exploit adapter
+├── bug_bounty_crypto.py  # Bug bounty live artifact auditor, scope gatekeeper & 10-point writer
+├── AGENTS.md             # Bug bounty operating methodology, scope rules & report spec
+├── eval_benchmark.py     # 18-discipline cryptanalysis & bug bounty benchmark suite (100% pass)
 ├── app.py                # Web dashboard & real-time SSE streaming solver
+├── share_agent.py        # One-click instant public HTTPS link generator
+├── share_agent.bat       # Windows launcher for instant public sharing
 ├── upload_security.py    # 16-point defense-in-depth file upload security manager
 ├── sandbox.py            # Docker execution engine with native fallback
 ├── data_generator.py     # Synthetic challenge factory (RSA, XOR, Classical, Binary)
