@@ -432,13 +432,13 @@ Interactive client automation for live remote CTF network services:
 
 ---
 
-### Q. 18-Discipline Verification & Benchmark Suite (`eval_benchmark.py`)
+### Q. 22-Discipline Verification & Benchmark Suite (`eval_benchmark.py`)
 
-Automated validation suite evaluating correctness across 18 core cryptanalysis and bug bounty disciplines:
+Automated validation suite evaluating correctness across 22 core cryptanalysis, bug bounty, and exploit generation disciplines:
 
-- **Test Disciplines**: RSA Cube Root, RSA Fermat, RSA Wiener, ECC BSGS DLog, Curve25519 Scalar Mult, Symmetric CBC Bit-Flip, Classical Vigenère, Classical Single-Byte XOR, Hash MD5 Cracking, Hash MD Length Extension, PRNG MT19937 Untwisting, PRNG LCG State Recovery, Lattice Clos Knapsack, Z3 / Bitwise Custom Inversion, Dynamic Flag Extraction, Recursive Multi-Layer Decoding, Bug Bounty Scope Gate Enforcement, Bug Bounty JWT & 10-Point Report.
-- **Benchmark Performance**: **18 / 18 Disciplines Passed (100.0%)** in **0.39 seconds**.
-- **Automated Logging**: Saves full test metrics and execution latencies to `outputs/benchmark_results.json`.
+- **Test Disciplines**: RSA Cube Root, RSA Fermat, RSA Wiener, ECC BSGS DLog, Curve25519 Scalar Mult, Symmetric CBC Bit-Flip, Classical Vigenère, Classical Single-Byte XOR, Hash MD5 Cracking, Hash MD Length Extension, PRNG MT19937 Untwisting, PRNG LCG State Recovery, Lattice Clos Knapsack, Z3 / Bitwise Custom Inversion, Dynamic Flag Extraction, Recursive Multi-Layer Decoding, Bug Bounty Scope Gate Enforcement, Bug Bounty JWT & 10-Point Report, OAuth 2.0 & SAML 2.0 Auditor (`FED-01`), Standalone PoC Generator (`POC-01`), Parallel Multi-Challenge Batch Solver (`BAT-01`), and Statistical Side-Channel Timing Oracle (`TIM-01`).
+- **Benchmark Performance**: **22 / 22 Disciplines Passed (100.0%)** in **4.18 seconds**.
+- **Automated Logging**: Saves full test metrics, execution latencies, and pass rates to `outputs/benchmark_results.json`.
 
 ---
 
@@ -475,6 +475,86 @@ An operational framework and live artifact auditor adhering to responsible discl
 
 ---
 
+### S. Standalone Zero-Dependency PoC Exporter (`poc_exporter.py`)
+
+Generates standalone, pure-Python 3 exploit scripts (`outputs/poc.py`) that run instantly on any machine without requiring third-party libraries (`pycryptodome`, `gmpy2`, `sympy`, or `z3`):
+
+- **Inlined Mathematical Preamble**: Embeds pure-Python arbitrary-precision implementations of:
+  - Extended Euclidean Algorithm (`egcd`) & Modular Inverse (`modinv`)
+  - Exact Integer $k$-th Root (`iroot`) via integer Newton-Raphson
+  - Chinese Remainder Theorem (`crt`)
+  - `long_to_bytes` and `bytes_to_long` bit-shift conversions
+  - Byte-by-byte XOR (`xor_bytes`)
+  - Printable ASCII validation (`is_printable_ascii`)
+- **Automated Script Formatting**: Extracts target parameters ($N, e, c, p, q$), indents exploit logic, generates verification assertions, and formats ready-to-run exploit code with colored console feedback.
+- **One-Click Web Export**: Integrates with the web dashboard via the `#poc-export-btn` button to export instant PoCs directly from any solution report.
+
+---
+
+### T. OAuth 2.0, OIDC & SAML 2.0 Security Auditor (`oauth_saml_auditor.py`)
+
+Comprehensive federated identity and authentication security auditor tailored for bug bounty hunting:
+
+- **OAuth 2.0 Authorization URL Auditor (`OAuthAuditor.audit_authorization_url`)**:
+  - Flags missing or predictable `state` parameters (CSRF risk).
+  - Detects missing PKCE (`code_challenge`) or `code_challenge_method=plain` downgrade vulnerability.
+  - Flags legacy insecure Implicit Grant flow (`response_type=token`).
+  - Warns on cleartext `http://` redirect URIs and open redirect vectors.
+  - Validates OpenID Connect `nonce` parameter presence when `scope=openid`.
+- **OpenID Connect Token Binding Auditor (`OAuthAuditor.audit_oidc_token_binding`)**:
+  - Validates cryptographic binding between access tokens and ID tokens via `at_hash` (SHA-256 left-128 bit slice).
+  - Validates authorization code binding via `c_hash`.
+- **SAML 2.0 Response Security Auditor (`SAMLAuditor.audit_saml_response`)**:
+  - Detects XML Signature Wrapping (XSW 1 through 8) vulnerability patterns (e.g. cloned unsigned assertions, responses signed with unsigned inner assertions).
+  - Flags completely unsigned SAML responses or unsigned assertions.
+  - Identifies deprecated cryptographic digest algorithms (`MD5`, `SHA-1`).
+  - Detects embedded X.509 `KeyInfo` certificates vulnerable to certificate injection spoofing.
+  - Audits `Conditions` elements for missing or expired `NotOnOrAfter` timestamps.
+- **Unified Federated Auditor (`audit_federated_identity`)**:
+  - Dispatches audits across authorization URLs and SAML responses.
+  - Synthesizes findings into a compliant 10-point responsible disclosure bug bounty markdown report with CWE mappings (CWE-384, CWE-347, CWE-328) and CVSS v3.1 scoring.
+
+---
+
+### U. Parallel Multi-Challenge CTF Batch Solver (`batch_solver.py`)
+
+High-throughput concurrent CTF challenge triage engine:
+
+- **Multi-Worker Execution**: Uses Python's `ThreadPoolExecutor` to process multiple challenges simultaneously, ideal for CTF team coordination and time-limited competitions.
+- **Fast Speculative Pre-Solver**:
+  - Multi-layer recursive decoding (Base64, Hex, URL, Binary, Morse, ROT13/47).
+  - High-speed dictionary cracking for MD5, SHA-1, SHA-256.
+  - Classical cipher automated solving (Caesar, ROT13, Single-byte XOR).
+  - Small exponent RSA exact root extraction and Fermat close-prime factorization.
+- **Triage Leaderboard Generation**: Categorizes all processed challenges into `SOLVED`, `VULNERABLE`, or `UNSOLVED` with elapsed time metrics and recovered flags.
+
+---
+
+### V. Statistical Side-Channel Timing Oracle Engine (`timing_oracle.py`)
+
+High-precision statistical timing attack engine designed to detect and exploit non-constant-time comparison vulnerabilities (e.g., HMAC comparisons, password checks, digital signatures):
+
+- **Welch's Two-Sample t-Test**: Employs Welch's t-test without assuming equal sample variances to statistically distinguish timing differences between candidate bytes:
+  $$t = \frac{\bar{X}_1 - \bar{X}_2}{\sqrt{\frac{s_1^2}{N_1} + \frac{s_2^2}{N_2}}}$$
+- **Outlier Filtering (IQR)**: Implements Interquartile Range ($Q_1 - 1.5 \cdot \text{IQR}, Q_3 + 1.5 \cdot \text{IQR}$) filtering to reject network jitter, garbage collection pauses, and OS scheduling spikes.
+- **Byte-by-Byte Secret Recovery**: Iteratively tests candidates ($0 \dots 255$ or hex $0 \dots f$) and isolates the candidate with the highest statistically significant timing delay ($t \ge 2.5$).
+- **Timing Leakage Auditor (`audit_timing_leakage`)**: Conducts baseline vs. manipulated byte probes to quantify side-channel leakage with millisecond resolution and Welch confidence metrics.
+
+---
+
+### W. Interactive Cryptographic Playground & Live Lab (`templates/index.html`)
+
+An integrated, browser-based cryptanalysis workspace featuring 5 dedicated interactive labs:
+
+1. **JWT Forge Lab**: Real-time interactive generation of `alg:none` tokens and RS256-to-HS256 public key confusion tokens with customized payload claims.
+2. **Lattice LLL Reducer**: In-browser integer matrix basis reduction with adjustable Lovász condition $\delta \in (0.25, 1.0)$.
+3. **MT19937 Untwister**: Clones Python's `random.Random` internal 624-word state from observed 32-bit integer outputs and predicts future values.
+4. **OAuth & SAML Auditor**: Live audit interface for testing OAuth 2.0 authorization URLs and raw XML SAML responses against known identity vulnerabilities.
+5. **CTF Batch Runner**: Concurrently triage and solve lists of CTF challenge descriptions with a real-time status leaderboard.
+- **One-Click PoC Exporter**: Includes an **Export Standalone PoC (.py)** action button on all solution reports for immediate exploit verification.
+
+---
+
 ### 🌐 Web Dashboard & REST APIs (`app.py`)
 
 The application features a modern Cyber/Glassmorphism web dashboard on `http://localhost:5000` with real-time SSE streaming logs:
@@ -507,8 +587,12 @@ The application features a modern Cyber/Glassmorphism web dashboard on `http://l
 | `/api/socket_probe` | `POST` | `{"target": "host:port"}` | Interactive probe of remote CTF TCP / Netcat socket service |
 | `/api/symbolic_solve` | `POST` | `{"text": "def encrypt(p)..."}` | PureBitVec & Z3 symbolic bitwise inversion, custom Feistel reversal, and byte transform preimage solving |
 | `/api/interactive_probe` | `POST` | `{"host": "...", "port": ...}` | Autonomous interactive remote netcat service prober and menu-driven oracle solver |
-| `/api/benchmark` | `GET` / `POST` | — | Runs the 18-discipline cryptanalysis and bug bounty benchmark suite (returns JSON report) |
+| `/api/benchmark` | `GET` / `POST` | — | Runs the 22-discipline cryptanalysis, bug bounty, and exploit benchmark suite (returns JSON report) |
 | `/api/export_writeup` | `POST` | `{"report": "..."}` | Exports structured GitHub-Flavored Markdown CTF writeup to `outputs/writeup.md` |
+| `/api/export_poc` | `POST` | `{"params": {...}, "exploit_body": "...", "target_flag": "..."}` | Exports standalone, zero-dependency Python 3 PoC exploit script (`outputs/poc.py`) |
+| `/api/batch_solve` | `POST` | `{"challenges": [{"id": "...", "text": "..."}, ...], "max_workers": 4}` | Concurrently triages and solves batches of CTF challenges with leaderboard scoring |
+| `/api/timing_audit` | `POST` | `{"target": "url_or_simulated", "leak_index": 3, "sample_size": 30}` | High-precision Welch's t-test statistical timing side-channel leakage audit |
+| `/api/federated_audit` | `POST` | `{"auth_url": "...", "saml_response": "..."}` | Audits OAuth 2.0 URLs, PKCE, OIDC bindings, and SAML 2.0 XML responses for identity flaws |
 | `/api/bug_bounty/scope_check` | `POST` | `{"target": "...", "program_name": "...", "in_scope_line": "..."}` | Evaluates 3 mandatory scope gates before remote interaction (AGENTS.md) |
 | `/api/bug_bounty/analyze_artifact` | `POST` | `{"artifact": "...", "artifact_type": "jwt|session_tokens|ciphertext|auto"}` | Audits live artifacts for JWT flaws, PRNG smells, ECB leakage, and generates 10-point writeup |
 | `/api/bug_bounty/jwt_audit` | `POST` | `{"token": "...", "public_key_pem": "..."}` | Targeted JWT audit (alg:none, RS256/HS256 confusion, weak secret cracking) |
@@ -604,8 +688,12 @@ crypto-ctf-agent/
 ├── z3_symbolic_solver.py # PureBitVec & Z3 symbolic bitwise solver, Feistel & byte preimage reverser
 ├── interactive_oracle_engine.py # Interactive TCP netcat oracle runner & menu-driven exploit adapter
 ├── bug_bounty_crypto.py  # Bug bounty live artifact auditor, scope gatekeeper & 10-point writer
+├── oauth_saml_auditor.py  # OAuth 2.0, OIDC, and SAML 2.0 security auditor
+├── poc_exporter.py        # Standalone zero-dependency Python 3 PoC generator
+├── batch_solver.py        # Parallel multi-challenge CTF solver & triage leaderboard
+├── timing_oracle.py       # Welch's t-test statistical timing oracle & side-channel analyzer
 ├── AGENTS.md             # Bug bounty operating methodology, scope rules & report spec
-├── eval_benchmark.py     # 18-discipline cryptanalysis & bug bounty benchmark suite (100% pass)
+├── eval_benchmark.py     # 22-discipline cryptanalysis, bug bounty & exploit benchmark suite (100% pass)
 ├── app.py                # Web dashboard & real-time SSE streaming solver
 ├── share_agent.py        # One-click instant public HTTPS link generator
 ├── share_agent.bat       # Windows launcher for instant public sharing
@@ -622,6 +710,8 @@ crypto-ctf-agent/
 │   └── prompt.txt        # Drop your challenge here
 └── outputs/
     ├── exploit.py        # Last generated exploit script
+    ├── poc.py            # Standalone zero-dependency exploit PoC
+    ├── writeup.md        # Comprehensive CTF solution / Bug Bounty report
     ├── result.txt        # Recovered plaintext / decoded result
     └── flag.txt          # Extracted flag format (if present)
 ```

@@ -844,6 +844,95 @@ def api_bug_bounty_audit_url():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/export_poc', methods=['POST'])
+def api_export_poc():
+    """Generates and exports a 100% standalone zero-dependency Python exploit script (outputs/poc.py)."""
+    data = request.get_json(silent=True) or {}
+    code = data.get('code', '')
+    params = data.get('parameters', {})
+    flag = data.get('flag', '')
+    cat = data.get('category', 'Cryptanalysis')
+    vuln = data.get('vulnerability', 'Cryptographic Flaw')
+    if not code.strip():
+        exploit_file = app.config['OUTPUTS_FOLDER'] / 'exploit.py'
+        if exploit_file.exists():
+            code = exploit_file.read_text(encoding='utf-8')
+    try:
+        from poc_exporter import export_standalone_poc
+        out_file = str(app.config['OUTPUTS_FOLDER'] / 'poc.py')
+        script = export_standalone_poc(
+            exploit_code=code,
+            parameters=params,
+            verified_flag=flag,
+            category=cat,
+            vulnerability=vuln,
+            output_path=out_file
+        )
+        return jsonify({'status': 'ok', 'poc_code': script, 'path': 'outputs/poc.py'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/batch_solve', methods=['POST'])
+def api_batch_solve():
+    """Concurrently triages and solves multiple challenges in parallel."""
+    data = request.get_json(silent=True) or {}
+    challenges = data.get('challenges', [])
+    workers = int(data.get('max_workers', 4))
+    if not challenges:
+        return jsonify({'error': 'No challenges provided for batch solving'}), 400
+    try:
+        from batch_solver import BatchSolver
+        solver = BatchSolver(max_workers=min(workers, 8))
+        res = solver.solve_batch(challenges)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/timing_audit', methods=['POST'])
+def api_timing_audit():
+    """Performs statistical Welch's t-test timing side-channel analysis."""
+    data = request.get_json(silent=True) or {}
+    url = data.get('url', '').strip()
+    if not url:
+        return jsonify({'error': 'No target URL provided'}), 400
+    try:
+        import urllib.request
+        def url_oracle(candidate: str) -> bool:
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=candidate.encode(),
+                    headers={'Content-Type': 'text/plain', 'User-Agent': 'CryptoAgent-TimingAuditor'}
+                )
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    return resp.status == 200
+            except Exception:
+                return False
+
+        from timing_oracle import TimingOracleSolver
+        res = TimingOracleSolver.audit_timing_leakage(url_oracle, sample_size=10, endpoint_url=url)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/federated_audit', methods=['POST'])
+def api_federated_audit():
+    """Audits OAuth 2.0 authorization URLs or SAML 2.0 XML responses."""
+    data = request.get_json(silent=True) or {}
+    target = data.get('target', '').strip()
+    if not target:
+        return jsonify({'error': 'No OAuth URL or SAML XML provided'}), 400
+    try:
+        from oauth_saml_auditor import audit_federated_identity
+        res = audit_federated_identity(target)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
     host = os.environ.get('FLASK_HOST', '0.0.0.0')
     port = int(os.environ.get('FLASK_PORT', 5000))

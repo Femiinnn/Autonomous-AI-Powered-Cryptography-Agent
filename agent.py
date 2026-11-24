@@ -480,6 +480,14 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
             try:
                 from verification_engine import export_ctf_writeup
                 export_ctf_writeup(rep, challenge_name=solved_category)
+                from poc_exporter import export_standalone_poc
+                export_standalone_poc(
+                    exploit_code=solved_code,
+                    parameters=extracted_params,
+                    verified_flag=verified_flag,
+                    category=solved_category,
+                    vulnerability=solved_attack
+                )
             except Exception:
                 pass
         except Exception:
@@ -1066,6 +1074,14 @@ def execute_in_docker(state: CryptoAgentState) -> dict:
             try:
                 from verification_engine import export_ctf_writeup
                 export_ctf_writeup(report, challenge_name=state.get("category", "CTF Challenge"))
+                from poc_exporter import export_standalone_poc
+                export_standalone_poc(
+                    exploit_code=code,
+                    parameters=state.get("extracted_parameters", {}),
+                    verified_flag=decoded_res or flag or "",
+                    category=state.get("category", "CTF Challenge"),
+                    vulnerability=state.get("attack_hypothesis", "Vulnerability")
+                )
             except Exception:
                 pass
         except Exception as e:

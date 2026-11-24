@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Tuple, Any
 # Common CTF salt/password candidate words & leetspeak variants
 COMMON_WORDLIST = [
     "admin", "password", "123456", "root", "toor", "guest", "test",
+    "hello", "world",
     "letmein", "welcome", "shadow", "master", "crypto", "secret",
     "flag", "ctf", "pico", "hack", "cyber", "pass123", "default",
     "12345678", "123456789", "qwerty", "dragon", "111111", "baseball",
@@ -113,7 +114,7 @@ def identify_hash_type(hash_str: str) -> List[Dict[str, Any]]:
 class CrackResult(dict):
     """Result dictionary that also stringifies to plaintext for flexible API access."""
     def __str__(self):
-        return self.get("plaintext", "")
+        return str(self.get("plaintext") or "")
     def __bool__(self):
         return self.get("status") == "cracked"
 

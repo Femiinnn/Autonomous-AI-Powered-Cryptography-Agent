@@ -236,6 +236,64 @@ def run_benchmark_suite() -> Dict[str, Any]:
 
     tests.append({"id": "BTY-02", "name": "Bug Bounty JWT & 10-Point Report", "cat": "BugBounty", "fn": test_bug_bounty_jwt})
 
+    # 19. OAuth 2.0 & SAML 2.0 Security Audit
+    def test_oauth_saml_audit():
+        from oauth_saml_auditor import OAuthAuditor, SAMLAuditor
+        u = "https://auth.test.com/oauth/authorize?response_type=code&client_id=123"
+        r_oauth = OAuthAuditor.audit_authorization_url(u)
+        saml_xml = "<Response><Signature><SignedInfo><DigestMethod Algorithm='sha1'/></SignedInfo></Signature><Assertion ID='1'/><Assertion ID='2'/></Response>"
+        r_saml = SAMLAuditor.audit_saml_response(saml_xml)
+        has_state_finding = any(f["type"] == "OAUTH_MISSING_STATE" for f in r_oauth.get("findings", []))
+        has_xsw = any(f["type"] == "SAML_MULTIPLE_ASSERTIONS_XSW" for f in r_saml.get("findings", []))
+        return has_state_finding and has_xsw
+
+    tests.append({"id": "FED-01", "name": "OAuth 2.0 & SAML 2.0 Security Audit", "cat": "Identity", "fn": test_oauth_saml_audit})
+
+    # 20. Standalone Zero-Dependency PoC Exporter
+    def test_standalone_poc_exporter():
+        from poc_exporter import export_standalone_poc
+        exploit = "m_int, exact = iroot(C, 3)\nresult = long_to_bytes(m_int)"
+        script = export_standalone_poc(
+            exploit_code=exploit,
+            parameters={"c": 402009525806160901844265994069956691692474492922568257125, "e": 3},
+            verified_flag="flag{e3}",
+            category="RSA",
+            vulnerability="Small Exponent Cube Root",
+            output_path="outputs/test_poc.py"
+        )
+        return "def iroot(" in script and "flag{e3}" in script and "def modinv(" in script
+
+    tests.append({"id": "POC-01", "name": "Standalone Zero-Dependency PoC Exporter", "cat": "Exporter", "fn": test_standalone_poc_exporter})
+
+    # 21. Parallel Multi-Challenge Batch Solver
+    def test_parallel_batch_solver():
+        from batch_solver import BatchSolver
+        challs = [
+            {"name": "Batch Hex", "text": "666c61677b62617463685f317d"},
+            {"name": "Batch MD5", "text": "5d41402abc4b2a76b9719d911017c592"},
+            {"name": "Batch Cube", "text": "e = 3\nc = 402009525806160901844265994069956691692474492922568257125\nn = 1000000000000000000000000000000000000000000000000000000000000"}
+        ]
+        solver = BatchSolver(max_workers=3)
+        res = solver.solve_batch(challs)
+        return res.get("solved_count") == 3
+
+    tests.append({"id": "BAT-01", "name": "Parallel Multi-Challenge Batch Solver", "cat": "Concurrency", "fn": test_parallel_batch_solver})
+
+    # 22. Statistical Welch's t-test Timing Side-Channel Oracle
+    def test_statistical_timing_oracle():
+        from timing_oracle import TimingOracleSolver
+        secret = "flag{timing_test}"
+        def mock_oracle(guess):
+            for i in range(min(len(guess), len(secret))):
+                if guess[i] != secret[i]:
+                    return False
+                time.sleep(0.001)
+            return len(guess) == len(secret)
+        res = TimingOracleSolver.audit_timing_leakage(mock_oracle, sample_size=10)
+        return res.get("timing_leak_detected") and res.get("welch_t_statistic", 0) > 2.0
+
+    tests.append({"id": "TIM-01", "name": "Statistical Welch Timing Oracle", "cat": "SideChannel", "fn": test_statistical_timing_oracle})
+
     # Run execution loop
     results = []
     passed = 0
