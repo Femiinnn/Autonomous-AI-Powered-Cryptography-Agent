@@ -315,6 +315,87 @@ class UploadSecurityManager:
         except zipfile.BadZipFile:
             raise SecurityValidationError("Corrupted or invalid zip archive.", "Zip Bomb")
 
+    def extract_safe_archive(self, file_path: Path, target_dir: Path) -> List[Dict[str, Any]]:
+        """
+        Safely extracts an archive (.zip, .tar, .tar.gz) into target_dir after validation.
+        Guarantees path traversal prevention and file permission lockdown.
+        """
+        import shutil
+        extracted = []
+        target_dir = target_dir.resolve()
+        ext = file_path.name.lower().split('.')[-1]
+
+        if ext == 'zip':
+            self.validate_zip_archive(file_path)
+            with zipfile.ZipFile(file_path, 'r') as z:
+                for member in z.infolist():
+                    if member.is_dir():
+                        continue
+                    clean_name = os.path.basename(member.filename)
+                    if not clean_name or clean_name.startswith('.'):
+                        continue
+                    dest = (target_dir / clean_name).resolve()
+                    if not dest.is_relative_to(target_dir):
+                        continue
+                    with z.open(member) as src, open(dest, 'wb') as dst:
+                        shutil.copyfileobj(src, dst)
+                    try:
+                        os.chmod(dest, 0o600)
+                    except Exception:
+                        pass
+                    extracted.append({
+                        'display_name': clean_name,
+                        'storage_name': clean_name,
+                        'path': dest,
+                        'size_bytes': dest.stat().st_size,
+                        'extension': clean_name.rsplit('.', 1)[-1].lower() if '.' in clean_name else '',
+                        'is_image': False,
+                        'status': 'extracted_secure'
+                    })
+        elif ext in ('tar', 'gz', 'tgz'):
+            import tarfile
+            try:
+                with tarfile.open(file_path, 'r:*') as t:
+                    total_size = 0
+                    members = t.getmembers()
+                    if len(members) > MAX_ARCHIVE_ENTRIES:
+                        raise SecurityValidationError(f"Tar archive has too many entries ({len(members)}).", "Zip Bomb")
+                    for m in members:
+                        if not m.isfile():
+                            continue
+                        clean_name = os.path.basename(m.name)
+                        if not clean_name or clean_name.startswith('.'):
+                            continue
+                        dest = (target_dir / clean_name).resolve()
+                        if not dest.is_relative_to(target_dir):
+                            continue
+                        total_size += m.size
+                        if total_size > MAX_UNCOMPRESSED_ARCHIVE:
+                            raise SecurityValidationError("Tar uncompressed size exceeded limit.", "Zip Bomb")
+                        fobj = t.extractfile(m)
+                        if fobj:
+                            with open(dest, 'wb') as dst:
+                                shutil.copyfileobj(fobj, dst)
+                            try:
+                                os.chmod(dest, 0o600)
+                            except Exception:
+                                pass
+                            extracted.append({
+                                'display_name': clean_name,
+                                'storage_name': clean_name,
+                                'path': dest,
+                                'size_bytes': dest.stat().st_size,
+                                'extension': clean_name.rsplit('.', 1)[-1].lower() if '.' in clean_name else '',
+                                'is_image': False,
+                                'status': 'extracted_secure'
+                            })
+            except Exception as e:
+                if isinstance(e, SecurityValidationError):
+                    raise
+                raise SecurityValidationError(f"Invalid tar archive: {e}", "Zip Bomb")
+
+        return extracted
+
     # ── 16. Metadata Stripping for Images ──────────────────────────────────────
     def sanitize_image_metadata(self, file_path: Path, ext: str) -> bool:
         """

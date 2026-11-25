@@ -2,23 +2,73 @@ import subprocess
 import tempfile
 import os
 import shutil
+import json
+import urllib.request
+import urllib.parse
 from typing import Dict, Any
 
 IMAGE_NAME = "crypto-sandbox:latest"
+SAGEMATH_CELL_URL = os.getenv("SAGEMATH_CELL_URL", "https://sagecell.sagemath.org/service")
 
 class DockerCryptoSandbox:
-    """Executes Python and SageMath exploit scripts inside Docker with native fallback."""
+    """Executes Python and SageMath exploit scripts inside Docker with native, WSL, and SageMathCell fallback."""
 
     def __init__(self, image: str = IMAGE_NAME, memory_limit: str = "1g", timeout: int = 30):
         self.image = image
         self.memory_limit = memory_limit
         self.timeout = timeout
         self.has_docker = shutil.which("docker") is not None
+        self._has_wsl_sage = None
+
+    def check_wsl_sage(self) -> bool:
+        """Checks if WSL is installed and has SageMath executable."""
+        if self._has_wsl_sage is not None:
+            return self._has_wsl_sage
+        if shutil.which("wsl") is None:
+            self._has_wsl_sage = False
+            return False
+        try:
+            res = subprocess.run(["wsl", "which", "sage"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
+            self._has_wsl_sage = (res.returncode == 0 and b"sage" in res.stdout)
+        except Exception:
+            self._has_wsl_sage = False
+        return self._has_wsl_sage
+
+    def execute_via_sagecell(self, code: str) -> Dict[str, Any]:
+        """
+        Executes SageMath code via the public or self-hosted SageMathCell API service.
+        Useful on Windows when Docker and WSL are not installed.
+        """
+        try:
+            payload = urllib.parse.urlencode({"code": code}).encode("utf-8")
+            req = urllib.request.Request(
+                SAGEMATH_CELL_URL,
+                data=payload,
+                headers={"User-Agent": "Crypto-CTF-Agent/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                stdout = data.get("stdout", "")
+                stderr = data.get("stderr", "")
+                success = data.get("success", True)
+                return {
+                    "stdout": stdout,
+                    "stderr": stderr,
+                    "exit_code": 0 if success else 1,
+                    "timed_out": False
+                }
+        except Exception as e:
+            return {
+                "stdout": "",
+                "stderr": f"SageMathCell API execution failed: {e}",
+                "exit_code": -1,
+                "timed_out": False
+            }
 
     def execute(self, code: str, is_sage: bool = False, allow_network: bool = False, job_id: str = None) -> Dict[str, Any]:
         """
         Runs code inside an ephemeral container if Docker is present,
-        otherwise falls back to native execution.
+        otherwise falls back to WSL, SageMathCell, or native execution.
         Isolates input challenge files per job_id to prevent cross-job IDOR.
         """
         ext = ".sage" if is_sage else ".py"
@@ -53,9 +103,33 @@ class DockerCryptoSandbox:
                             pass
 
         try:
+            # 1. Fallback to WSL SageMath if is_sage and Docker is unavailable
             if not self.has_docker:
-                # Fallback to host environment execution with UTF-8 encoding
                 has_sage_native = shutil.which("sage") is not None
+                if is_sage and not has_sage_native and self.check_wsl_sage():
+                    # Execute via WSL
+                    wsl_path = subprocess.run(["wsl", "wslpath", "-u", temp_path], stdout=subprocess.PIPE, text=True).stdout.strip()
+                    res = subprocess.run(
+                        ["wsl", "sage", wsl_path],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        text=True,
+                        timeout=self.timeout
+                    )
+                    return {
+                        "stdout": res.stdout,
+                        "stderr": res.stderr,
+                        "exit_code": res.returncode,
+                        "timed_out": False
+                    }
+
+                # 2. Fallback to SageMathCell API if is_sage and neither native nor WSL sage is available
+                if is_sage and not has_sage_native:
+                    sagecell_res = self.execute_sagecell(code)
+                    if sagecell_res.get("exit_code") == 0 or sagecell_res.get("stdout"):
+                        return sagecell_res
+
+                # 3. Native host Python or Sage execution
                 runner = "sage" if (is_sage and has_sage_native) else "python"
 
                 env = os.environ.copy()
@@ -87,6 +161,7 @@ class DockerCryptoSandbox:
                     "timed_out": False
                 }
 
+            # 4. Standard Docker sandbox execution
             filename = os.path.basename(temp_path)
 
             net_flag = "--network=host" if allow_network else "--network=none"

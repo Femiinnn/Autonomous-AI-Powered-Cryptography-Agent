@@ -132,47 +132,62 @@ def solve():
         fname = meta['display_name']
         save_path = meta['path']
 
-        if meta.get('is_image'):
+        # Handle Archive Unpacking (ZIP / TAR / GZ)
+        target_files_to_process = [(fname, save_path, meta)]
+        if meta.get('extension') in ('zip', 'tar', 'gz', 'tgz'):
             try:
-                from PIL import Image
-                with Image.open(save_path) as img:
-                    file_info_blocks.append(
-                        f"\n--- Attached Image: {fname} ---\n"
-                        f"Format: {img.format} | Dimensions: {img.size} | Mode: {img.mode} (EXIF metadata stripped)\n"
-                        f"Your solver can open it directly in the working directory using:\n"
-                        f"    from PIL import Image\n"
-                        f"    img = Image.open('{fname}')\n"
-                    )
-            except Exception:
-                file_info_blocks.append(f"\n--- Attached Image: {fname} (size: {meta['size_bytes']} bytes) ---\n")
-        else:
-            try:
-                raw_bytes = save_path.read_bytes()
-                printable = sum(32 <= b <= 126 or b in (9, 10, 13) for b in raw_bytes[:4000])
-                total = min(len(raw_bytes), 4000)
-                is_text = (printable / max(total, 1)) > 0.80
+                extracted_entries = upload_sec.extract_safe_archive(save_path, save_path.parent)
+                if extracted_entries:
+                    file_info_blocks.append(f"\n📦 [Archive Auto-Extracted] {fname}: {len(extracted_entries)} files extracted into job workspace.\n")
+                    for entry in extracted_entries:
+                        target_files_to_process.append((entry['display_name'], entry['path'], entry))
+            except Exception as e:
+                file_info_blocks.append(f"\n⚠️ Archive extraction note: {e}\n")
 
-                if is_text:
-                    text_content = raw_bytes.decode('utf-8', errors='replace').strip()
-                    if len(text_content) > 100000:
-                        preview = text_content[:100000] + f"\n... [Truncated: showing 100KB of {len(raw_bytes)} bytes]"
+        for curr_fname, curr_path, curr_meta in target_files_to_process:
+            if curr_meta.get('extension') in ('zip', 'tar', 'gz', 'tgz') and len(target_files_to_process) > 1:
+                continue  # Skip raw archive binary dump if files were unpacked
+            if curr_meta.get('is_image'):
+                try:
+                    from PIL import Image
+                    with Image.open(curr_path) as img:
+                        file_info_blocks.append(
+                            f"\n--- Attached Image: {curr_fname} ---\n"
+                            f"Format: {img.format} | Dimensions: {img.size} | Mode: {img.mode} (EXIF metadata stripped)\n"
+                            f"Your solver can open it directly in the working directory using:\n"
+                            f"    from PIL import Image\n"
+                            f"    img = Image.open('{curr_fname}')\n"
+                        )
+                except Exception:
+                    file_info_blocks.append(f"\n--- Attached Image: {curr_fname} (size: {curr_meta['size_bytes']} bytes) ---\n")
+            else:
+                try:
+                    raw_bytes = curr_path.read_bytes()
+                    printable = sum(32 <= b <= 126 or b in (9, 10, 13) for b in raw_bytes[:4000])
+                    total = min(len(raw_bytes), 4000)
+                    is_text = (printable / max(total, 1)) > 0.80
+
+                    if is_text:
+                        text_content = raw_bytes.decode('utf-8', errors='replace').strip()
+                        if len(text_content) > 100000:
+                            preview = text_content[:100000] + f"\n... [Truncated: showing 100KB of {len(raw_bytes)} bytes]"
+                        else:
+                            preview = text_content
+                        file_info_blocks.append(
+                            f"\n--- Attached File: {curr_fname} ({len(raw_bytes)} bytes) ---\n"
+                            f"{preview}\n"
+                        )
                     else:
-                        preview = text_content
-                    file_info_blocks.append(
-                        f"\n--- Attached File: {fname} ({len(raw_bytes)} bytes) ---\n"
-                        f"{preview}\n"
-                    )
-                else:
-                    hex_sample = raw_bytes[:128].hex()
-                    file_info_blocks.append(
-                        f"\n--- Attached Binary/Encrypted File: {fname} ({len(raw_bytes)} bytes) ---\n"
-                        f"First {min(len(raw_bytes), 128)} bytes (hex): {hex_sample}\n"
-                        f"The file is accessible in your solver working directory as '{fname}'. Read with:\n"
-                        f"    with open('{fname}', 'rb') as f:\n"
-                        f"        data = f.read()\n"
-                    )
-            except Exception:
-                file_info_blocks.append(f"\n--- Attached File: {fname} ({meta['size_bytes']} bytes) ---\n")
+                        hex_sample = raw_bytes[:128].hex()
+                        file_info_blocks.append(
+                            f"\n--- Attached Binary/Encrypted File: {curr_fname} ({len(raw_bytes)} bytes) ---\n"
+                            f"First {min(len(raw_bytes), 128)} bytes (hex): {hex_sample}\n"
+                            f"The file is accessible in your solver working directory as '{curr_fname}'. Read with:\n"
+                            f"    with open('{curr_fname}', 'rb') as f:\n"
+                            f"        data = f.read()\n"
+                        )
+                except Exception:
+                    file_info_blocks.append(f"\n--- Attached File: {curr_fname} ({curr_meta.get('size_bytes', 0)} bytes) ---\n")
 
     # Merge text + file content
     full_challenge = challenge_text
