@@ -403,7 +403,7 @@ def detect_hash_or_encoding(state: CryptoAgentState) -> dict:
     bounty_res = {}
     is_bounty_artifact = bool(
         re.search(r'eyJ[a-zA-Z0-9_\-]+\.eyJ[a-zA-Z0-9_\-]+', challenge)
-        or re.search(r'\b(jwt|bearer|reset.?token|session.?id|bounty|in.?scope|hackerone|bugcrowd)\b', challenge, re.IGNORECASE)
+        or re.search(r'\b(jwt|bearer|reset.?token|session.?id|bounty|in.?scope|hackerone|bugcrowd|vulnerability.?audit)\b', challenge, re.IGNORECASE)
         or "-----BEGIN CERTIFICATE" in challenge
     )
     if is_bounty_artifact and not verified_flag:

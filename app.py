@@ -90,7 +90,7 @@ def solve():
     if nc_target:
         challenge_text = (challenge_text + f"\n[Remote Netcat Target: {nc_target}]").strip()
     if bounty_url:
-        challenge_text = (challenge_text + f"\n[Bug Bounty Target URL: {bounty_url}]").strip()
+        challenge_text = (challenge_text + f"\n[Vulnerability Audit URL: {bounty_url}]").strip()
 
     # ── Handle uploaded files with 16-point Defense-in-Depth Security ─────────
     files_list = request.files.getlist('challenge_files')
